@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.cache/
 
 # Virtual environments
 .venv/
@@ -12,13 +13,15 @@ env/
 # Jupyter
 .ipynb_checkpoints/
 
-# Data files
-data/raw/*
+# Data files. Keep one reproducible PoC snapshot; ignore future API runs.
+data/raw/prices/*
+data/raw/profiles/*
+!data/raw/prices/*_20260825T213028Z.csv
+!data/raw/profiles/*_20260825T213028Z.json
 data/processed/*
 data/features/*
 
 # Keep folder structure
-!data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/features/.gitkeep
 
@@ -29,6 +32,9 @@ data/features/*
 models/
 *.pkl
 *.joblib
+
+# Generated evaluation details (the compact metrics report may be versioned)
+reports/model_predictions.csv
 
 # Logs
 logs/

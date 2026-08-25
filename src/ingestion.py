@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import time
@@ -8,325 +9,126 @@ from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
-from sqlalchemy import text
 
-from database import get_engine
-
-
-# Die fünf Aktien für den ersten Proof of Concept
-STOCKS = [
-    "AAPL",
-    "MSFT",
-    "NVDA",
-    "SAP.DE",
-    "ALV.DE",
-]
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-RAW_PRICE_DIR = PROJECT_ROOT / "data" / "raw" / "prices"
-RAW_PROFILE_DIR = PROJECT_ROOT / "data" / "raw" / "profile"
-
-RUN_TIMESTAMP = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-
-UPSERT_STOCK_SQL = text(
-    """
-    INSERT INTO dim_stock (
-        ticker,
-        company_name,
-        sector,
-        industry,
-        country,
-        currency,
-        exchange,
-        market_cap
+try:
+    from .config import (
+        RAW_PRICE_DIR,
+        RAW_PROFILE_DIR,
+        TICKERS,
+        YFINANCE_CACHE_DIR,
+        ticker_file_stem,
     )
-    VALUES (
-        :ticker,
-        :company_name,
-        :sector,
-        :industry,
-        :country,
-        :currency,
-        :exchange,
-        :market_cap
+except ImportError:  # Allows: python src/ingestion.py
+    from config import (
+        RAW_PRICE_DIR,
+        RAW_PROFILE_DIR,
+        TICKERS,
+        YFINANCE_CACHE_DIR,
+        ticker_file_stem,
     )
-    ON CONFLICT (ticker)
-    DO UPDATE SET
-        company_name = EXCLUDED.company_name,
-        sector = EXCLUDED.sector,
-        industry = EXCLUDED.industry,
-        country = EXCLUDED.country,
-        currency = EXCLUDED.currency,
-        exchange = EXCLUDED.exchange,
-        market_cap = EXCLUDED.market_cap
-    RETURNING stock_id;
-    """
-)
-
-
-UPSERT_PRICE_SQL = text(
-    """
-    INSERT INTO fact_stock_price (
-        stock_id,
-        trade_date,
-        open_price,
-        high_price,
-        low_price,
-        close_price,
-        volume,
-        dividends,
-        stock_splits
-    )
-    VALUES (
-        :stock_id,
-        :trade_date,
-        :open_price,
-        :high_price,
-        :low_price,
-        :close_price,
-        :volume,
-        :dividends,
-        :stock_splits
-    )
-    ON CONFLICT (stock_id, trade_date)
-    DO UPDATE SET
-        open_price = EXCLUDED.open_price,
-        high_price = EXCLUDED.high_price,
-        low_price = EXCLUDED.low_price,
-        close_price = EXCLUDED.close_price,
-        volume = EXCLUDED.volume,
-        dividends = EXCLUDED.dividends,
-        stock_splits = EXCLUDED.stock_splits;
-    """
-)
-
-
-def as_float(value):
-    """Konvertiert Werte sicher zu float oder None."""
-
-    if value is None or pd.isna(value):
-        return None
-
-    return float(value)
-
-
-def as_int(value):
-    """Konvertiert Werte sicher zu int oder None."""
-
-    if value is None or pd.isna(value):
-        return None
-
-    return int(value)
 
 
 def prepare_directories() -> None:
-    """Erstellt die benötigten Raw-Data-Ordner."""
+    """Create the raw-layer directories."""
 
     RAW_PRICE_DIR.mkdir(parents=True, exist_ok=True)
     RAW_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    YFINANCE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    yf.set_tz_cache_location(str(YFINANCE_CACHE_DIR))
 
 
 def save_raw_data(
     ticker_symbol: str,
     info: dict,
     history: pd.DataFrame,
-) -> None:
-    """
-    Speichert API-Rohdaten unverändert als CSV bzw. JSON.
-    """
+    run_timestamp: str,
+) -> tuple[Path, Path]:
+    """Persist one immutable API snapshot as CSV and JSON."""
 
-    safe_ticker = ticker_symbol.replace(".", "_")
-
-    price_file = RAW_PRICE_DIR / f"{safe_ticker}_{RUN_TIMESTAMP}.csv"
-    profile_file = RAW_PROFILE_DIR / f"{safe_ticker}_{RUN_TIMESTAMP}.json"
+    safe_ticker = ticker_file_stem(ticker_symbol)
+    price_file = RAW_PRICE_DIR / f"{safe_ticker}_{run_timestamp}.csv"
+    profile_file = RAW_PROFILE_DIR / f"{safe_ticker}_{run_timestamp}.json"
 
     history.to_csv(price_file)
+    profile_file.write_text(
+        json.dumps(info, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
 
-    with open(profile_file, "w", encoding="utf-8") as file:
-        json.dump(
-            info,
-            file,
-            ensure_ascii=False,
-            indent=2,
-            default=str,
-        )
-
-    logging.info("Raw data saved for %s", ticker_symbol)
+    return price_file, profile_file
 
 
-def get_stock_id(connection, ticker_symbol: str, info: dict) -> int:
-    """
-    Fügt Stammdaten ein oder aktualisiert sie und gibt die stock_id zurück.
-    """
+def download_ticker(
+    ticker_symbol: str,
+    period: str = "5y",
+    run_timestamp: str | None = None,
+) -> tuple[Path, Path]:
+    """Download and persist one ticker without writing to the curated database."""
 
-    payload = {
-        "ticker": ticker_symbol,
-        "company_name": info.get("longName") or info.get("shortName"),
-        "sector": info.get("sector"),
-        "industry": info.get("industry"),
-        "country": info.get("country"),
-        "currency": info.get("currency"),
-        "exchange": info.get("exchange"),
-        "market_cap": as_int(info.get("marketCap")),
-    }
-
-    result = connection.execute(UPSERT_STOCK_SQL, payload)
-
-    return result.scalar_one()
-
-
-def prepare_price_rows(
-    history: pd.DataFrame,
-    stock_id: int,
-) -> list[dict]:
-    """
-    Bereitet Kursdaten für den Datenbankimport vor.
-    """
-
-    prices = history.reset_index().copy()
-
-    date_column = "Date"
-
-    if date_column not in prices.columns:
-        date_column = "Datetime"
-
-    prices["trade_date"] = pd.to_datetime(
-        prices[date_column],
-        utc=True,
-    ).dt.date
-
-    required_columns = [
-        "Open",
-        "High",
-        "Low",
-        "Close",
-        "Volume",
-        "Dividends",
-        "Stock Splits",
-    ]
-
-    for column in required_columns:
-        if column not in prices.columns:
-            prices[column] = 0
-
-    prices = prices.dropna(subset=["trade_date", "Close"])
-
-    rows = []
-
-    for row in prices.to_dict(orient="records"):
-        rows.append(
-            {
-                "stock_id": stock_id,
-                "trade_date": row["trade_date"],
-                "open_price": as_float(row["Open"]),
-                "high_price": as_float(row["High"]),
-                "low_price": as_float(row["Low"]),
-                "close_price": as_float(row["Close"]),
-                "volume": as_int(row["Volume"]),
-                "dividends": as_float(row["Dividends"]),
-                "stock_splits": as_float(row["Stock Splits"]),
-            }
-        )
-
-    return rows
-
-
-def load_ticker(ticker_symbol: str) -> None:
-    """
-    Lädt Stammdaten und historische Kursdaten einer Aktie.
-    """
-
-    logging.info("Loading data for %s", ticker_symbol)
+    timestamp = run_timestamp or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    logging.info("Downloading raw data for %s", ticker_symbol)
 
     ticker = yf.Ticker(ticker_symbol)
-
-    # Stammdaten abrufen
-    info = ticker.info or {}
-
-    # Fünf Jahre tägliche Kursdaten abrufen
     history = ticker.history(
-        period="5y",
+        period=period,
         interval="1d",
         auto_adjust=True,
         actions=True,
     )
 
     if history.empty:
-        raise ValueError(
-            f"No historical price data received for {ticker_symbol}."
-        )
+        raise ValueError(f"No historical price data received for {ticker_symbol}.")
 
-    # Rohdaten speichern
-    save_raw_data(
-        ticker_symbol=ticker_symbol,
-        info=info,
-        history=history,
-    )
+    try:
+        info = ticker.info or {}
+    except Exception as error:  # Price data is still useful if profile lookup fails.
+        logging.warning("Profile download failed for %s: %s", ticker_symbol, error)
+        info = {}
 
-    engine = get_engine()
+    paths = save_raw_data(ticker_symbol, info, history, timestamp)
+    logging.info("%s: saved %s raw price rows", ticker_symbol, len(history))
+    return paths
 
-    with engine.begin() as connection:
-        stock_id = get_stock_id(
-            connection=connection,
-            ticker_symbol=ticker_symbol,
-            info=info,
-        )
 
-        price_rows = prepare_price_rows(
-            history=history,
-            stock_id=stock_id,
-        )
+def run_ingestion(
+    tickers: tuple[str, ...] | list[str] = TICKERS,
+    period: str = "5y",
+) -> dict[str, str]:
+    """Download all requested tickers and return a per-ticker result."""
 
-        connection.execute(
-            UPSERT_PRICE_SQL,
-            price_rows,
-        )
+    prepare_directories()
+    run_timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    results: dict[str, str] = {}
 
-    logging.info(
-        "%s: %s daily price records loaded.",
-        ticker_symbol,
-        len(price_rows),
-    )
+    for ticker_symbol in tickers:
+        try:
+            download_ticker(ticker_symbol, period, run_timestamp)
+            results[ticker_symbol] = "ok"
+        except Exception as error:
+            logging.exception("Ingestion failed for %s", ticker_symbol)
+            results[ticker_symbol] = f"failed: {error}"
+        time.sleep(1)
+
+    return results
 
 
 def main() -> None:
-    """
-    Startpunkt für die Initialbefüllung.
-    """
+    parser = argparse.ArgumentParser(description="Download Yahoo Finance raw data")
+    parser.add_argument("--tickers", nargs="+", default=list(TICKERS))
+    parser.add_argument("--period", default="5y")
+    args = parser.parse_args()
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s | %(levelname)s | %(message)s",
     )
+    results = run_ingestion(args.tickers, args.period)
 
-    prepare_directories()
+    for ticker_symbol, result in results.items():
+        print(f"{ticker_symbol}: {result}")
 
-    successful_tickers = []
-    failed_tickers = []
-
-    for ticker_symbol in STOCKS:
-        try:
-            load_ticker(ticker_symbol)
-            successful_tickers.append(ticker_symbol)
-
-        except Exception as error:
-            logging.exception(
-                "Loading failed for %s: %s",
-                ticker_symbol,
-                error,
-            )
-            failed_tickers.append(ticker_symbol)
-
-        # Kleine Pause zwischen den API-Abfragen
-        time.sleep(1)
-
-    print("\nInitial load finished.")
-    print(f"Successful: {successful_tickers}")
-
-    if failed_tickers:
-        print(f"Failed: {failed_tickers}")
+    if any(result != "ok" for result in results.values()):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

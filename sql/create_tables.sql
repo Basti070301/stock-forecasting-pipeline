@@ -11,7 +11,7 @@
 -- Dimension table: Stock master data
 -- ============================================================
 
-CREATE TABLE dim_stock (
+CREATE TABLE IF NOT EXISTS dim_stock (
     stock_id SERIAL PRIMARY KEY,
     ticker VARCHAR(20) NOT NULL UNIQUE,
     company_name VARCHAR(255),
@@ -28,7 +28,7 @@ CREATE TABLE dim_stock (
 -- Fact table: Historical stock prices
 -- ============================================================
 
-CREATE TABLE fact_stock_price (
+CREATE TABLE IF NOT EXISTS fact_stock_price (
     price_id SERIAL PRIMARY KEY,
     stock_id INT NOT NULL,
     trade_date DATE NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE fact_stock_price (
 -- Fact table: Engineered stock features
 -- ============================================================
 
-CREATE TABLE fact_stock_features (
+CREATE TABLE IF NOT EXISTS fact_stock_features (
     feature_id SERIAL PRIMARY KEY,
     stock_id INT NOT NULL,
     trade_date DATE NOT NULL,
@@ -80,8 +80,8 @@ CREATE TABLE fact_stock_features (
 -- Indexes for better query performance
 -- ============================================================
 
-CREATE INDEX idx_stock_price_stock_date
+CREATE INDEX IF NOT EXISTS idx_stock_price_stock_date
 ON fact_stock_price (stock_id, trade_date);
 
-CREATE INDEX idx_stock_features_stock_date
+CREATE INDEX IF NOT EXISTS idx_stock_features_stock_date
 ON fact_stock_features (stock_id, trade_date);
