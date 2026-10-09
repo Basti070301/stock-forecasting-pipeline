@@ -1,0 +1,9 @@
+services:
+  si-frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend/Dockerfile
+  si-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile

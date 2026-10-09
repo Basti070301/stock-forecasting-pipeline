@@ -1,0 +1,45 @@
+name: M2.2 isolated Docker validation
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Download pinned FinBERT and test offline CPU inference
+        type: boolean
+        default: true
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.25.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python scripts/configure_docker.py --project stockintelligence-m22-test-ci
+      - run: docker compose --env-file .env.docker -f compose.yaml -f compose.build.yaml config --quiet
+      - name: Build and exercise isolated stack
+        env:
+          CHECK_MODEL: ${{ inputs.model }}
+        run: |
+          if [ "$CHECK_MODEL" = true ]; then
+            python scripts/docker_smoke.py --build --model
+          else
+            python scripts/docker_smoke.py --build
+          fi
+      - run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
+        working-directory: frontend
+      - run: node scripts/docker_browser_smoke.mjs
+      - name: Record health and logs
+        if: always()
+        run: |
+          docker compose --env-file .env.docker ps
+          docker compose --env-file .env.docker logs --tail 100
+      - name: Stop only this test project; preserve volumes
+        if: always()
+        run: docker compose --env-file .env.docker down

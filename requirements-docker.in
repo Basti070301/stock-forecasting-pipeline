@@ -1,0 +1,18 @@
+# Linux amd64 / Python 3.12. Resolve with uv; preserve generated hashes.
+--extra-index-url https://download.pytorch.org/whl/cpu
+pandas==3.0.6
+numpy==2.5.3
+scikit-learn==1.9.1
+sqlalchemy==2.1.4
+psycopg2-binary==2.9.13
+python-dotenv==1.2.4
+joblib==1.6.0
+yfinance==1.7.0
+fastapi==0.143.0
+uvicorn==0.54.0
+httpx==0.28.1
+pydantic-settings==2.15.0
+exchange-calendars==4.13.2
+langdetect==1.0.9
+transformers==4.57.6
+torch==2.14.1+cpu

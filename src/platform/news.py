@@ -1,9 +1,11 @@
 import hashlib
 import logging
 import math
+import os
 import time
 from datetime import datetime, timezone
 from functools import lru_cache
+from pathlib import Path
 from threading import Lock
 from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -153,6 +155,23 @@ class AlphaVantage:
 
 
 _model_lock = Lock()
+FINBERT_REVISION = "4556d13015211d73dccd3fdd39d39232506f3e43"
+
+
+def finbert_options():
+    from src.config import PROJECT_ROOT
+
+    # Preserve the already-populated Windows cache; Docker uses standard HF_HOME/hub.
+    cache = (
+        Path(os.environ["HF_HOME"]) / "hub"
+        if os.getenv("HF_HOME")
+        else PROJECT_ROOT / ".cache" / "huggingface"
+    )
+    return {
+        "cache_dir": Path(os.environ.get("HF_HUB_CACHE", str(cache))),
+        "revision": FINBERT_REVISION,
+        "local_files_only": os.getenv("HF_HUB_OFFLINE", "0").upper() in {"1", "TRUE", "YES"},
+    }
 
 
 @lru_cache(maxsize=1)
@@ -160,11 +179,17 @@ def finbert(device=-1):
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 
-    from src.config import PROJECT_ROOT
-
-    cache = PROJECT_ROOT / ".cache" / "huggingface"
-    tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert", cache_dir=cache)
-    model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert", cache_dir=cache)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert", **finbert_options())
+        model = AutoModelForSequenceClassification.from_pretrained(
+            "ProsusAI/finbert", **finbert_options()
+        )
+    except OSError:
+        raise ValueError(
+            "FinBERT-Gewichte fehlen oder sind nicht lesbar. Modell explizit mit "
+            "HF_HUB_OFFLINE=0 python -m src.platform.maintenance download-model laden; "
+            "anschließend dasselbe HF_HOME-Volume verwenden."
+        ) from None
     return pipeline(
         "text-classification",
         model=model,

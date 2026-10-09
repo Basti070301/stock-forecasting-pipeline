@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     finbert_device: int = -1
     allowed_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
     mutation_token: str = ""
+    allowed_hosts: list[str] = ["127.0.0.1", "localhost", "testserver"]
+    api_docs_enabled: bool = True
+    allow_mutations: bool = True
+    proxy_token: str = ""
+    required_schema_version: int = 1
 
 
 class Instrument(BaseModel):

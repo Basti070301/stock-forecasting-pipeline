@@ -3,7 +3,8 @@ import json
 import os
 from pathlib import Path
 
-os.environ.setdefault("HF_HOME", str(Path(__file__).resolve().parents[1] / ".cache" / "huggingface"))
+if not os.getenv("HF_HOME"):
+    os.environ.setdefault("HF_HUB_CACHE", str(Path(__file__).resolve().parents[1] / ".cache" / "huggingface"))
 
 from src.platform.news import analyze  # noqa: E402
 

@@ -11,6 +11,8 @@ Die bestehende Python-Pipeline und ihre Referenzartefakte bleiben erhalten.
 **Architektur/Features:** [docs/PLATFORM_ARCHITECTURE.md](docs/PLATFORM_ARCHITECTURE.md).
 **Tatsächlicher Lieferstand und Prüfungen:** [docs/DELIVERY_REPORT.md](docs/DELIVERY_REPORT.md).
 **Anbieter/Lizenzen:** [docs/PROVIDERS.md](docs/PROVIDERS.md).
+**M2.2 Docker/Portainer:** [Schnellstart und Betrieb](docs/docker-deployment.md),
+[technischer Bericht und offene Containerprüfungen](docs/M22_REPORT.md).
 
 Der kostenlose Offline-Start zeigt die echten historischen Repository-Snapshots.
 Live-Daten, News und Prognosen werden nicht simuliert. Next-Day-Modelltraining

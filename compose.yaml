@@ -1,28 +1,106 @@
+# Image-only Portainer/Compose stack. Add compose.build.yaml for CLI builds.
+name: ${COMPOSE_PROJECT_NAME:-stockintelligence}
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+x-security: &security
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  read_only: true
+  logging: *logging
 services:
-  web:
-    build: .
-    ports:
-      - "127.0.0.1:8000:8000"
+  si-frontend:
+    <<: *security
+    image: ${SI_FRONTEND_IMAGE:-stockintelligence-frontend:m22}
+    platform: linux/amd64
+    user: "101:101"
     environment:
-      SI_MODE: demo
-      SI_MUTATION_TOKEN: ${SI_MUTATION_TOKEN:?Set a local mutation token in .env for Docker}
-    volumes:
-      - demo-state:/app/.runtime
-  postgres:
-    image: postgres:17
-    profiles: [live]
-    environment:
-      POSTGRES_DB: ${DB_NAME:-stock_forecasting}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set a database password in .env}
+      SI_PUBLIC_HOST: ${SI_PUBLIC_HOST:-127.0.0.1}
+      SI_AUTH_USER: ${SI_AUTH_USER:-research}
+      SI_AUTH_PASSWORD: ${SI_AUTH_PASSWORD:?Generate .env.docker first}
+      SI_PROXY_TOKEN: ${SI_PROXY_TOKEN:?Generate .env.docker first}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${SI_BIND_IP:-127.0.0.1}:${SI_PORT:-8085}:8443"
+    volumes: [si-tls:/var/lib/si-tls]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m,uid=101,gid=101"]
+    networks: [si-edge, si-app]
+    depends_on:
+      si-backend: {condition: service_healthy}
+    mem_limit: 192m
+    cpus: 0.5
+    pids_limit: 100
+  si-backend:
+    <<: *security
+    image: ${SI_BACKEND_IMAGE:-stockintelligence-backend:m22}
+    platform: linux/amd64
+    user: "10001:10001"
+    environment:
+      SI_MODE: live
+      SI_RUNTIME_DIR: /app/.runtime
+      SI_FINBERT_ENABLED: "true"
+      SI_FINBERT_DEVICE: "-1"
+      SI_ALLOWED_HOSTS: '["${SI_PUBLIC_HOST:-127.0.0.1}","127.0.0.1","localhost"]'
+      SI_ALLOWED_ORIGINS: '["https://${SI_PUBLIC_HOST:-127.0.0.1}:${SI_PORT:-8085}"]'
+      SI_API_DOCS_ENABLED: "false"
+      SI_ALLOW_MUTATIONS: "false"
+      SI_REQUIRED_SCHEMA_VERSION: "2"
+      SI_PROXY_TOKEN: ${SI_PROXY_TOKEN:?Generate .env.docker first}
+      SI_ALPHA_VANTAGE_KEY: ${SI_ALPHA_VANTAGE_KEY:-}
+      DB_HOST: si-postgres
+      DB_PORT: "5432"
+      DB_NAME: stockintel
+      DB_USER: si_reader
+      DB_PASSWORD: ${SI_DB_APP_PASSWORD:?Generate .env.docker first}
+      PGCONNECT_TIMEOUT: "5"
+      HF_HOME: /app/.cache/huggingface
+      HF_HUB_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      - si-runtime:/app/.runtime
+      - si-data:/app/data
+      - si-cache:/app/.cache
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=256m,uid=10001,gid=10001"]
+    networks: [si-app, si-database, si-egress]
+    depends_on:
+      si-postgres: {condition: service_healthy}
+    mem_limit: ${SI_BACKEND_MEMORY:-4g}
+    cpus: ${SI_BACKEND_CPUS:-2.0}
+    pids_limit: 256
+    init: true
+  si-postgres:
+    <<: *security
+    image: postgres:17-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+    platform: linux/amd64
+    user: "999:999"
+    environment:
+      POSTGRES_USER: si_owner
+      POSTGRES_DB: stockintel
+      POSTGRES_PASSWORD: ${SI_DB_ADMIN_PASSWORD:?Generate .env.docker first}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes: [si-pgdata:/var/lib/postgresql/data]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,uid=999,gid=999
+      - /var/run/postgresql:rw,noexec,nosuid,size=16m,uid=999,gid=999
+    networks: [si-database]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
       retries: 10
+      start_period: 30s
+    mem_limit: ${SI_DB_MEMORY:-1g}
+    cpus: 1.0
+    pids_limit: 128
+networks:
+  si-edge: {}
+  si-app: {internal: true}
+  si-database: {internal: true}
+  si-egress: {}
 volumes:
-  demo-state:
-  pg-data:
+  si-pgdata: {}
+  si-runtime: {}
+  si-data: {}
+  si-cache: {}
+  si-tls: {}

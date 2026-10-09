@@ -163,21 +163,13 @@ eigenen PostgreSQL-Container. Ohne diese Einstellung wird genau dieser Test
 
 ## Docker als Option
 
-Docker Desktop muss laufen. Für lokale Mutationen durch die Container-Bridge
-`SI_MUTATION_TOKEN` in `.env` setzen; außerdem `DB_PASSWORD` für das optionale
-PostgreSQL-Profil. Keine Standardpasswörter verwenden.
-
-```powershell
-docker compose up --build web
-# Optional nur einen lokalen PostgreSQL-Server bereitstellen:
-docker compose --profile live up -d postgres
-```
-
-Der Webcontainer läuft standardmäßig im Demo-Modus; Port 8000 und der optionale
-DB-Port 5432 sind ausschließlich an 127.0.0.1 gebunden. Für eine bestehende
-PostgreSQL-Datenbank ist der oben beschriebene native Start der einfachste Weg.
-Docker-Live-Betrieb benötigt zusätzlich SI_MODE/DB_* für den Webservice und die
-explizite Migration vor dem Start. Keine automatische Live-Migration vorgesehen.
+Der neue Drei-Service-Stack verwendet `.env.docker`, HTTPS auf
+`127.0.0.1:8085`, Anmeldung und ausschließlich internes PostgreSQL.
+Siehe [docker-deployment.md](docker-deployment.md) für die geordnete
+Initialisierung, Images, FinBERT-Cache und Portainer.
+Die native `.env`, `scripts/start.ps1`, Port 8000 und die oben beschriebenen
+lokalen Funktionen bleiben unabhängig davon erhalten. Docker veröffentlicht
+keine Trainings-/Importaktionen; sie werden dort explizit per CLI ausgelöst.
 
 ## Typische Probleme
 

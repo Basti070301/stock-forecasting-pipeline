@@ -11,7 +11,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.config import PROJECT_ROOT
@@ -21,7 +21,7 @@ from .jobs import Jobs
 from .market import MarketService, records
 from .news import analyze_pending, collect_news, news_items
 from .research import BacktestRequest, evaluate
-from .store import Store
+from .store import TABLES, Store
 
 
 class NewsRequest(BaseModel):
@@ -39,22 +39,28 @@ def create_app(settings=None, store=None):
         elif "si_schema_versions" not in inspect(app.state.store.engine).get_table_names():
             raise RuntimeError("Zuerst python -m src.platform.store --migrate ausführen")
         app.state.market = MarketService(app.state.store)
-        app.state.jobs = Jobs(app.state.store)
+        app.state.jobs = Jobs(app.state.store) if settings.allow_mutations else None
         yield
-        app.state.jobs.close()
+        if app.state.jobs is not None:
+            app.state.jobs.close()
         if not store:
             app.state.store.engine.dispose()
 
-    app = FastAPI(title="Stock Intelligence AI", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(
+        title="Stock Intelligence AI",
+        version="1.0.0",
+        lifespan=lifespan,
+        docs_url="/docs" if settings.api_docs_enabled else None,
+        redoc_url="/redoc" if settings.api_docs_enabled else None,
+        openapi_url="/openapi.json" if settings.api_docs_enabled else None,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type", "X-SI-Token"],
     )
-    app.add_middleware(
-        TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
-    )
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 
     @app.exception_handler(SQLAlchemyError)
     async def database_error(request, exc):
@@ -65,6 +71,13 @@ def create_app(settings=None, store=None):
 
     @app.middleware("http")
     async def response_headers(request, call_next):
+        if settings.proxy_token and request.url.path not in {"/api/health", "/api/ready"}:
+            if not hmac.compare_digest(
+                request.headers.get("x-si-proxy-token", ""), settings.proxy_token
+            ):
+                return JSONResponse(
+                    status_code=403, content={"detail": "Proxy-Anmeldung erforderlich"}
+                )
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -75,6 +88,8 @@ def create_app(settings=None, store=None):
         return app.state.store
 
     def authorize(request: Request):
+        if not settings.allow_mutations:
+            raise HTTPException(403, "Serverbetrieb: Wartung nur über die CLI am Docker-Host")
         origin = request.headers.get("origin")
         if origin and origin not in settings.allowed_origins + [
             "http://127.0.0.1:8000",
@@ -105,6 +120,20 @@ def create_app(settings=None, store=None):
     def health():
         return {"status": "ok", "mode": settings.mode, "version": "1.0.0"}
 
+    @app.get("/api/ready")
+    def ready():
+        with state().engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            version = connection.execute(
+                select(TABLES["schema_versions"].c.id).where(
+                    TABLES["schema_versions"].c.id
+                    == f"{settings.mode}:v{settings.required_schema_version}"
+                )
+            ).scalar_one_or_none()
+        if version is None:
+            raise HTTPException(503, "Schema-Migration fehlt")
+        return {"status": "ready", "mode": settings.mode}
+
     @app.get("/api/settings")
     def configuration():
         return {
@@ -128,7 +157,7 @@ def create_app(settings=None, store=None):
                 },
                 {
                     "name": "FinBERT",
-                    "status": "Aktiviert · Download beim Analysejob"
+                    "status": "Aktiviert · expliziter Cache-Download im Docker-Betrieb"
                     if settings.finbert_enabled
                     else "Deaktiviert · optionale Installation",
                 },
