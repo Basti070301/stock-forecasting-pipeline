@@ -1,6 +1,8 @@
 # Anbieter, Lizenzen und Grenzen
 
-Quellenprüfung: 08.10.2026. Keine kostenpflichtige Buchung vorgenommen.
+M2-Quellenprüfung: 08.10.2026. M3 ergänzt Finnhub und ausdrücklich erlaubte RSS-
+Feeds; aktueller Stand und Rechteprüfung in [live-news-intelligence.md](live-news-intelligence.md).
+Keine kostenpflichtige Buchung vorgenommen.
 
 ## Yahoo Finance / yfinance
 
@@ -19,11 +21,15 @@ Mehrere Ticker in einer Anfrage bedeuten beim Anbieter eine UND-Verknüpfung;
 deshalb erfolgen lokale Abrufe instrumentweise.
 
 [Offizielle API-Dokumentation](https://www.alphavantage.co/documentation/#news-sentiment)
-kennzeichnet diesen Endpoint derzeit als Premium. Ein gültiger Key allein
-garantiert keine Berechtigung. [Allgemeine Kontingentangaben](https://www.alphavantage.co/support/)
+beschreibt diesen Endpoint unter Market News & Sentiment. Ein gültiger Key allein
+garantiert keine Berechtigung. Eine generelle Premium-Pflicht wird für M3 nicht
+aus der aktuellen Überschrift abgeleitet. [Allgemeine Kontingentangaben](https://www.alphavantage.co/support/)
 nennen für viele kostenlose Endpunkte 25 Anfragen/Tag; das ist keine Zusage
 für kostenlose News. Die Anwendung begrenzt zusätzlich auf 25 logische Abrufe
 pro UTC-Tag und mindestens 60 Sekunden Abstand, über Neustarts hinweg.
+Diese Angaben beschreiben M2. M3 zählt jeden tatsächlichen HTTP-Versuch
+einschließlich Retry ins persistente Budget und speichert standardmäßig nur
+Titel/Metadaten; siehe die oben verlinkte M3-Anleitung.
 Pro Abruf maximal drei Versuche bei Transport-/5xx-Fehlern (1 und 2 Sekunden
 Backoff, 20 Sekunden HTTP-Timeout). 429 sowie Note/Information/Error Message
 brechen verständlich ab; keine unendlichen Retries oder Tarifumgehung.

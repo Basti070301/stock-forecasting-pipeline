@@ -43,7 +43,7 @@ def migrate(engine, reader_password=None):
                     text("INSERT INTO si_deployment_migrations (version, sha256) VALUES (:v,:h)"),
                     {"v": path.name, "h": checksum},
                 )
-        for version in (1, 2):
+        for version in (1, 2, 3):
             conn.execute(
                 insert(TABLES["schema_versions"])
                 .values(
@@ -228,7 +228,7 @@ def main():
             engine = get_engine()
             if args.command == "init-db":
                 migrate(engine, reader_password)
-                result = {"schema_version": 2}
+                result = {"schema_version": 3}
             elif args.command == "import-reference":
                 result = import_reference(engine, args.raw)
             else:

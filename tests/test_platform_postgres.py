@@ -73,7 +73,7 @@ def test_deployment_migration_seed_and_existing_data_preserved():
             )
             assert (
                 conn.execute(text("SELECT count(*) FROM si_deployment_migrations")).scalar_one()
-                == 2
+                == 3
             )
         assert first["prices"] >= 0
     finally:

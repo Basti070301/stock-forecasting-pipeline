@@ -30,6 +30,19 @@ class Article(BaseModel):
     language: str
     event_type: str | None = None
     provider: str = "alpha_vantage"
+    last_updated_at: AwareDatetime | None = None
+    mapping_evidence: list[dict] = []
+    provider_id: str | None = None
+    data_kind: str = "provider"
+
+    @field_validator("url")
+    @classmethod
+    def public_link(cls, value):
+        if value.username or value.password:
+            raise ValueError("News-URLs dürfen keine Zugangsdaten enthalten")
+        if any(key.lower() in {"apikey", "api_key", "token", "password", "secret"} for key, _ in parse_qsl(value.query or "")):
+            raise ValueError("News-URLs dürfen keine Zugangsschlüssel enthalten")
+        return value
 
     @field_validator("published_at", "first_seen_at")
     @classmethod
@@ -108,50 +121,55 @@ class AlphaVantage:
                 if attempt == 2:
                     raise ValueError("Alpha Vantage vorübergehend nicht erreichbar") from None
                 self.sleep(2**attempt)
-        if not isinstance(payload, dict) or any(
-            k in payload for k in ("Note", "Information", "Error Message")
-        ):
-            raise ValueError(
-                "Alpha Vantage: Zugriff oder Kontingent prüfen; NEWS_SENTIMENT benötigt passenden Tarif"
-            )
-        if "feed" not in payload:
-            raise ValueError("Alpha Vantage lieferte keine gültige News-Antwort")
-        seen = datetime.now(timezone.utc)
-        articles = []
-        for item in payload["feed"]:
-            if symbol not in {t.get("ticker") for t in item.get("ticker_sentiment", [])}:
-                continue
-            try:
-                content = item["title"] + " " + item.get("summary", "")
-                detected = detect_langs(content)
-                language = detected[0].lang if detected and detected[0].prob >= 0.9 else "unknown"
-                articles.append(
-                    Article(
-                        source=item["source"],
-                        title=item["title"],
-                        description=item.get("summary", ""),
-                        url=item["url"],
-                        published_at=datetime.strptime(
-                            item["time_published"], "%Y%m%dT%H%M%S"
-                        ).replace(tzinfo=timezone.utc),
-                        first_seen_at=seen,
-                        tickers=[instrument["ticker"]],
-                        language=language,
-                        event_type=next(
-                            (
-                                t["topic"]
-                                for t in item.get("topics", [])
-                                if t["topic"] in {"earnings", "ipo", "mergers_and_acquisitions"}
-                            ),
-                            None,
+        return parse_alpha_payload(payload, instrument)
+
+
+def parse_alpha_payload(payload, instrument):
+    symbol = instrument["news_symbol"]
+    if not isinstance(payload, dict) or any(
+        k in payload for k in ("Note", "Information", "Error Message")
+    ):
+        raise ValueError(
+            "Alpha Vantage: Zugriff, Kontingent und NEWS_SENTIMENT-Berechtigung prüfen"
+        )
+    if "feed" not in payload:
+        raise ValueError("Alpha Vantage lieferte keine gültige News-Antwort")
+    seen = datetime.now(timezone.utc)
+    articles = []
+    for item in payload["feed"]:
+        if symbol not in {t.get("ticker") for t in item.get("ticker_sentiment", [])}:
+            continue
+        try:
+            content = item["title"] + " " + item.get("summary", "")
+            detected = detect_langs(content)
+            language = detected[0].lang if detected and detected[0].prob >= 0.9 else "unknown"
+            articles.append(
+                Article(
+                    source=item["source"],
+                    title=item["title"],
+                    description=item.get("summary", ""),
+                    url=item["url"],
+                    published_at=datetime.strptime(item["time_published"], "%Y%m%dT%H%M%S").replace(
+                        tzinfo=timezone.utc
+                    ),
+                    first_seen_at=seen,
+                    tickers=[instrument["ticker"]],
+                    language=language,
+                    event_type=next(
+                        (
+                            t["topic"]
+                            for t in item.get("topics", [])
+                            if t["topic"] in {"earnings", "ipo", "mergers_and_acquisitions"}
                         ),
-                    )
+                        None,
+                    ),
                 )
-            except (ValueError, KeyError):
-                logging.warning(
-                    "Ungültiger News-Datensatz verworfen (keine Provider-Payload protokolliert)"
-                )
-        return articles
+            )
+        except (ValueError, KeyError):
+            logging.warning(
+                "Ungültiger News-Datensatz verworfen (keine Provider-Payload protokolliert)"
+            )
+    return articles
 
 
 _model_lock = Lock()
@@ -209,6 +227,7 @@ def score_labels(labels):
     return {
         **scores,
         "sentiment": scores["positive"] - scores["negative"],
+        "dominant": max(scores, key=scores.get),
         "model": "ProsusAI/finbert",
     }
 
@@ -270,16 +289,6 @@ def news_items(store):
 
 
 def analyze_pending(store):
-    if not store.settings.finbert_enabled:
-        raise ValueError(
-            "FinBERT ist deaktiviert; SI_FINBERT_ENABLED=true und optionale Pakete erforderlich"
-        )
-    count = 0
-    known = {s["news_id"] for s in store.list("sentiments")}
-    for item in store.list("news"):
-        if item["id"] not in known:
-            result = analyze(item, store.settings.finbert_device)
-            if result:
-                store.add("sentiments", result, item["id"])
-                count += 1
-    return {"analyzed": count}
+    from .news_engine import NewsEngine
+
+    return NewsEngine(store).analyze()

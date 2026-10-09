@@ -19,13 +19,15 @@ from src.config import PROJECT_ROOT
 from .config import Instrument, Settings
 from .jobs import Jobs
 from .market import MarketService, records
-from .news import analyze_pending, collect_news, news_items
+from .news import analyze_pending
+from .news_engine import NewsEngine, stamp
+from .news_scheduler import NewsScheduler
 from .research import BacktestRequest, evaluate
 from .store import TABLES, Store
 
 
 class NewsRequest(BaseModel):
-    ticker: str
+    ticker: str | None = None
 
 
 def create_app(settings=None, store=None):
@@ -38,9 +40,16 @@ def create_app(settings=None, store=None):
             app.state.store.migrate()
         elif "si_schema_versions" not in inspect(app.state.store.engine).get_table_names():
             raise RuntimeError("Zuerst python -m src.platform.store --migrate ausführen")
+        if settings.news_enabled and not NewsEngine(app.state.store).schema_available():
+            raise RuntimeError(
+                "News-Schema fehlt; explizit python -m src.platform.store --migrate ausführen"
+            )
         app.state.market = MarketService(app.state.store)
         app.state.jobs = Jobs(app.state.store) if settings.allow_mutations else None
+        app.state.news_scheduler = NewsScheduler(app.state.store, app.state.jobs)
+        app.state.news_scheduler.start()
         yield
+        app.state.news_scheduler.close()
         if app.state.jobs is not None:
             app.state.jobs.close()
         if not store:
@@ -140,6 +149,7 @@ def create_app(settings=None, store=None):
             "mode": settings.mode,
             "watchlist": state().instruments(),
             "token_required": bool(settings.mutation_token),
+            "allow_mutations": settings.allow_mutations,
             "providers": [
                 {
                     "name": "Yahoo Finance",
@@ -148,12 +158,9 @@ def create_app(settings=None, store=None):
                     else "Manueller Abruf verfügbar; keine Live-SLA",
                 },
                 {
-                    "name": "Alpha Vantage",
-                    "status": "Demo: deaktiviert"
-                    if settings.mode == "demo"
-                    else "Konfiguriert; Tarif beim Abruf prüfen"
-                    if settings.alpha_vantage_key
-                    else "Nicht konfiguriert · API-Schlüssel fehlt",
+                    "name": f"News · {settings.news_provider}",
+                    "status": NewsEngine(state()).configured_reason()
+                    or "Konfiguriert; tatsächlichen Abrufstatus unter News Intelligence prüfen",
                 },
                 {
                     "name": "FinBERT",
@@ -198,21 +205,102 @@ def create_app(settings=None, store=None):
 
     @app.get("/api/news")
     def news(ticker: str | None = None, days: int = Query(30, ge=1, le=3650)):
-        scores = {s["news_id"]: s for s in state().list("sentiments")}
+        if ticker:
+            instrument(ticker)
         cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
         return [
-            {
-                **n,
-                "analysis": scores.get(n["id"]),
-                "analysis_status": "Analysiert"
-                if n["id"] in scores
-                else "Sprache nicht unterstützt oder unklar"
-                if n["language"] != "en"
-                else "Analyse ausstehend",
-            }
-            for n in news_items(state())
+            n
+            for n in NewsEngine(state()).items()
             if (not ticker or ticker in n["tickers"]) and pd.Timestamp(n["published_at"]) >= cutoff
         ]
+
+    @app.get("/api/news/feed")
+    def news_feed(
+        ticker: str | None = None,
+        source: str | None = Query(None, max_length=200),
+        provider: Literal["finnhub", "alpha_vantage", "rss"] | None = None,
+        days: int = Query(30, ge=1, le=3650),
+        sentiment: Literal["positive", "negative", "neutral", "unavailable"] | None = None,
+        page: int = Query(1, ge=1, le=10000),
+        page_size: int = Query(20, ge=1, le=100),
+        as_of: str | None = Query(None, max_length=40),
+    ):
+        if ticker:
+            instrument(ticker)
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        try:
+            snapshot = stamp(as_of) if as_of else now
+            if snapshot > now:
+                raise ValueError("Zukünftiger Zeitpunkt")
+        except ValueError:
+            raise HTTPException(
+                422, "as_of verlangt einen gültigen Zeitpunkt mit Zeitzone bis jetzt"
+            ) from None
+        engine = NewsEngine(state())
+        rows = [
+            n
+            for n in engine.items(snapshot)
+            if stamp(n["published_at"]) >= snapshot - timedelta(days=days)
+            and (not ticker or ticker in n["tickers"])
+            and (not source or n["source"] == source)
+            and (not provider or n["provider"] == provider)
+            and (
+                not sentiment
+                or (n["analysis"] and n["analysis"]["dominant"] == sentiment)
+                or (sentiment == "unavailable" and not n["analysis"])
+            )
+        ]
+        start = (page - 1) * page_size
+        return {
+            "items": rows[start : start + page_size],
+            "total": len(rows),
+            "page": page,
+            "page_size": page_size,
+            "as_of": snapshot.isoformat(),
+            "sources": sorted({n["source"] for n in engine.items(snapshot)}),
+            "data_state": "unavailable"
+            if not rows
+            else "historical_provider"
+            if all(n["stale"] for n in rows)
+            else "provider",
+        }
+
+    @app.get("/api/news/providers")
+    def news_providers():
+        result = NewsEngine(state()).statuses()
+        result["scheduler"] = {
+            "cycles": app.state.news_scheduler.cycles,
+            "running": bool(
+                app.state.news_scheduler.thread and app.state.news_scheduler.thread.is_alive()
+            ),
+        }
+        return result
+
+    @app.get("/api/news/summary")
+    def news_summary():
+        engine = NewsEngine(state())
+        return {
+            "items": [engine.aggregate(item["ticker"], 7) for item in state().instruments()],
+            "latest": engine.items()[:5],
+            "providers": engine.statuses(),
+        }
+
+    @app.get("/api/stocks/{ticker}/sentiment")
+    def stock_sentiment(ticker: str, as_of: str | None = Query(None, max_length=40)):
+        instrument(ticker)
+        try:
+            snapshot = stamp(as_of) if as_of else None
+            if snapshot and snapshot > pd.Timestamp.now(tz="UTC").to_pydatetime():
+                raise ValueError("Zukunft")
+        except ValueError:
+            raise HTTPException(422, "Ungültiger as_of-Zeitpunkt") from None
+        engine = NewsEngine(state())
+        return {
+            "ticker": ticker,
+            "windows": [engine.aggregate(ticker, days, snapshot) for days in (1, 7, 30)],
+        }
 
     @app.get("/api/stocks/{ticker}/news")
     def stock_news(ticker: str):
@@ -332,12 +420,15 @@ def create_app(settings=None, store=None):
 
     @app.post("/api/news/refresh", status_code=202, dependencies=[Depends(authorize)])
     def refresh_news(body: NewsRequest):
-        item = instrument(body.ticker)
-        if settings.mode == "demo" or not settings.alpha_vantage_key:
-            raise HTTPException(409, "News-Abruf benötigt Live-Modus und Alpha-Vantage-Zugang")
-        if not item.get("news_symbol"):
-            raise HTTPException(409, "Bestätigte News-Provider-Zuordnung fehlt")
-        return submit("news", lambda: collect_news(state(), item))
+        engine = NewsEngine(state())
+        if body.ticker:
+            instrument(body.ticker)
+        reason = engine.configured_reason()
+        if reason:
+            raise HTTPException(409, reason)
+        if body.ticker and not any(body.ticker in covered for _, _, covered in engine.sources()):
+            raise HTTPException(409, "Keine bestätigte Provider-Zuordnung für diese Aktie")
+        return submit("news", lambda: NewsEngine(state()).refresh(body.ticker, strict=True))
 
     @app.post("/api/news/analyze", status_code=202, dependencies=[Depends(authorize)])
     def analyze_news():

@@ -114,23 +114,13 @@ class MarketService:
         return result
 
     def radar(self, days=7):
-        from .news import news_items
-
-        news = news_items(self.store)
-        sentiments = {s["news_id"]: s for s in self.store.list("sentiments")}
+        from .news_engine import NewsEngine
+        engine = NewsEngine(self.store)
         output = []
-        now = pd.Timestamp.now(tz="UTC")
         for instrument in self.store.instruments():
             row = self.detail(instrument)
-            items = [
-                n
-                for n in news
-                if row["ticker"] in n["tickers"]
-                and now - pd.Timedelta(days=days) <= pd.Timestamp(n["first_seen_at"]) <= now
-                and now - pd.Timedelta(days=days) <= pd.Timestamp(n["published_at"]) <= now
-            ]
-            scores = [sentiments[n["id"]]["sentiment"] for n in items if n["id"] in sentiments]
-            sentiment = float(np.mean(scores)) if scores else None
+            summary = engine.aggregate(row["ticker"], days)
+            sentiment = summary["mean_sentiment"]
             momentum = row["features"].get("momentum_7")
             if row["session_complete"] is False:
                 momentum = None
@@ -154,7 +144,7 @@ class MarketService:
             available = [v for v in components.values() if v is not None]
             row.update(
                 news_sentiment=sentiment,
-                news_count=len(items),
+                news_count=summary["analyzed_count"],
                 radar_score=round(sum(available), 1) if available else None,
                 components=components,
                 coverage=len(available),
