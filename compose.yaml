@@ -1,0 +1,28 @@
+services:
+  web:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SI_MODE: demo
+      SI_MUTATION_TOKEN: ${SI_MUTATION_TOKEN:?Set a local mutation token in .env for Docker}
+    volumes:
+      - demo-state:/app/.runtime
+  postgres:
+    image: postgres:17
+    profiles: [live]
+    environment:
+      POSTGRES_DB: ${DB_NAME:-stock_forecasting}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set a database password in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      retries: 10
+volumes:
+  demo-state:
+  pg-data:

@@ -1,0 +1,12 @@
+.git
+.env
+.venv
+.runtime
+.cache
+frontend/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+notebooks
+models
+__pycache__

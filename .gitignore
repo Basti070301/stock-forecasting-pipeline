@@ -27,6 +27,11 @@ data/features/*
 
 # Environment variables
 .env
+.env.*
+!.env.example
+!.env.docker.example
+backups/
+secrets/
 
 # Models
 models/
@@ -47,3 +52,14 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Web platform runtime
+node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+.runtime/
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.tsbuildinfo

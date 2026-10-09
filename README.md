@@ -1,5 +1,30 @@
 # Stock Forecasting Pipeline
 
+## Stock Intelligence AI – neue lokale Webplattform
+
+Dieses Repository enthält jetzt zusätzlich eine FastAPI-/React-Weboberfläche:
+historisches Dashboard, Stock Radar, Aktienanalyse, News-/FinBERT-Anbindung,
+Walk-Forward-Backtests, Model Analytics, Paper-Trading-Journal und Pipeline-Status.
+Die bestehende Python-Pipeline und ihre Referenzartefakte bleiben erhalten.
+
+**Start und Installation:** [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md).
+**Architektur/Features:** [docs/PLATFORM_ARCHITECTURE.md](docs/PLATFORM_ARCHITECTURE.md).
+**Tatsächlicher Lieferstand und Prüfungen:** [docs/DELIVERY_REPORT.md](docs/DELIVERY_REPORT.md).
+**Anbieter/Lizenzen:** [docs/PROVIDERS.md](docs/PROVIDERS.md).
+
+Der kostenlose Offline-Start zeigt die echten historischen Repository-Snapshots.
+Live-Daten, News und Prognosen werden nicht simuliert. Next-Day-Modelltraining
+ist als kalibrierte historische Forschung ausführbar; aktive Prognosen benötigen
+eine unabhängige Freigabe. Intraday ist mangels geeigneter Daten deaktiviert.
+
+Nach Installation der Webabhängigkeiten und `pnpm build` in `frontend`:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn src.platform.api:app --host 127.0.0.1 --port 8000
+```
+
+Die folgenden Abschnitte dokumentieren weiterhin den ursprünglichen PoC.
+
 End-to-End-Proof-of-Concept für die Seminararbeit:
 
 > **Konzeption einer skalierbaren Datenarchitektur für eine KI-Anwendung zur
