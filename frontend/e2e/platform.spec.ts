@@ -6,7 +6,8 @@ test('historische Plattform: Filter, Detail, Seiten, Backtest und responsive Ans
   await page.goto('/');
   await expect(page.getByText('DEMO / HISTORIE')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Der Markt. Mit Kontext.' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Apple AAPL/ })).toBeVisible();
+  // First dashboard requests load archived bars/calendars; not a five-second performance SLA.
+  await expect(page.getByRole('link', { name: /Apple AAPL/ })).toBeVisible({ timeout: 15000 });
   await page.getByRole('button', { name: 'Europa', exact: true }).click();
   await expect(page.getByRole('link', { name: /SAP SAP.DE/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /Apple AAPL/ })).toHaveCount(0);

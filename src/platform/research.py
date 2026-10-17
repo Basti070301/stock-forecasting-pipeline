@@ -130,6 +130,43 @@ def logit(probability):
     return np.log(p / (1 - p)).reshape(-1, 1)
 
 
+def research_estimator(model):
+    """Shared fixed estimators for walk-forward and explicitly final research training."""
+    if model not in {"logistic", "random_forest"}:
+        raise ValueError("Unbekannter Forschungsmodelltyp")
+    estimator = build_model()
+    if model == "random_forest":
+        estimator = Pipeline(
+            [
+                ("preprocessing", estimator.named_steps["preprocessing"]),
+                (
+                    "classifier",
+                    RandomForestClassifier(
+                        n_estimators=100,
+                        max_depth=5,
+                        min_samples_leaf=20,
+                        random_state=42,
+                        n_jobs=1,
+                    ),
+                ),
+            ]
+        )
+    return estimator
+
+
+def calibration_bins(target, probability):
+    frame = pd.DataFrame({"actual": target, "probability": probability})
+    bins = []
+    for low in np.arange(0, 1, 0.1):
+        subset = frame[(frame.probability >= low) & (frame.probability < low + 0.1)]
+        if len(subset):
+            bins.append(
+                {"predicted": float(subset.probability.mean()),
+                 "observed": float(subset.actual.mean()), "count": len(subset)}
+            )
+    return bins
+
+
 def evaluate(prices, instruments, request, artifact_dir: Path | None = None):
     prices = prices.copy()
     prices["trade_date"] = pd.to_datetime(prices.trade_date)
@@ -147,23 +184,7 @@ def evaluate(prices, instruments, request, artifact_dir: Path | None = None):
     for number, (train, calibration, test) in enumerate(partitions(frame, request)):
         if train.target_next_day_up.nunique() < 2 or calibration.target_next_day_up.nunique() < 2:
             continue
-        estimator = build_model()
-        if request.model == "random_forest":
-            estimator = Pipeline(
-                [
-                    ("preprocessing", estimator.named_steps["preprocessing"]),
-                    (
-                        "classifier",
-                        RandomForestClassifier(
-                            n_estimators=100,
-                            max_depth=5,
-                            min_samples_leaf=20,
-                            random_state=42,
-                            n_jobs=1,
-                        ),
-                    ),
-                ]
-            )
+        estimator = research_estimator(request.model)
         estimator.fit(train[inputs], train.target_next_day_up.astype(int))
         calibrator = LogisticRegression(random_state=42)
         calibrator.fit(
@@ -249,17 +270,7 @@ def evaluate(prices, instruments, request, artifact_dir: Path | None = None):
         max_drawdown=float((equity / peaks - 1).min()),
         average_excess_return=None,
     )
-    bins = []
-    for low in np.arange(0, 1, 0.1):
-        subset = result[(result.probability >= low) & (result.probability < low + 0.1)]
-        if len(subset):
-            bins.append(
-                {
-                    "predicted": float(subset.probability.mean()),
-                    "observed": float(subset.actual.mean()),
-                    "count": len(subset),
-                }
-            )
+    bins = calibration_bins(result.actual.to_numpy(), result.probability.to_numpy())
     import sklearn
 
     import src.feature_engineering as feature_module

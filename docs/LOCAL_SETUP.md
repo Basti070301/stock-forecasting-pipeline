@@ -22,7 +22,7 @@ Set-Location frontend
 pnpm install --frozen-lockfile
 pnpm build
 Set-Location ..
-Copy-Item .env.example .env
+if (-not (Test-Path -LiteralPath .env)) { Copy-Item .env.example .env }
 .\scripts\start.ps1
 ```
 
@@ -37,8 +37,10 @@ Weboberfläche: http://127.0.0.1:8000 · API-Dokumentation: http://127.0.0.1:800
 Strg+C beendet den Server. Ein Worker; keine öffentliche Bindung.
 
 Die Demo-Datenbank `.runtime/demo.sqlite` wird beim ersten Start additiv angelegt.
-Backtests und Watchlist bleiben nach Neustarts erhalten. Externe News-Abrufe
-sind im Demo-Modus gesperrt. Keine Fake-News, Fake-Prognosen oder Demo-Live-Kurse.
+Backtests und Watchlist bleiben nach Neustarts erhalten. Echte News können
+unabhängig vom historischen Kursmodus ausdrücklich aktiviert werden; siehe
+[Live-News-Anleitung](live-news-intelligence.md). Keine Fake-News, Fake-Prognosen
+oder Demo-Live-Kurse.
 
 ## Entwicklung mit Hot Reload
 
@@ -103,13 +105,20 @@ Artefakte in `.runtime/<mode>/backtests/<run-id>/`.
 
 ## Nachrichten und FinBERT
 
-Alpha Vantage benötigt einen vom Nutzer bereitgestellten gültigen API-Zugang
-mit Berechtigung für `NEWS_SENTIMENT`. Dieser Endpoint ist laut aktueller
-Dokumentation Premium; ein kostenloser Key garantiert keinen Zugriff. Es werden
-keine Abos abgeschlossen. Siehe [PROVIDERS.md](PROVIDERS.md).
+M3 verwendet bevorzugt Finnhub Company News für AAPL/MSFT/NVDA; Alpha Vantage
+und ausdrücklich zugelassene RSS-Feeds sind Alternativen. Ein API-Key allein
+belegt keine Inhalts-/Speicher-/Analyserechte oder Endpoint-Berechtigung.
+Kein kostenpflichtiger Tarif wird aktiviert. Konfiguration und Einschränkungen:
+[live-news-intelligence.md](live-news-intelligence.md) und [PROVIDERS.md](PROVIDERS.md).
 
 ```dotenv
-SI_ALPHA_VANTAGE_KEY=dein_key
+SI_NEWS_ENABLED=true
+SI_NEWS_PROVIDER=finnhub
+SI_FINNHUB_KEY=dein_nur_lokal_eingetragener_key
+# Erst nach Prüfung der eigenen Nutzungs-/Speicher-/Analyserechte auf true setzen.
+SI_NEWS_RIGHTS_ACCEPTED=false
+SI_NEWS_STORE_SUMMARIES=false
+SI_NEWS_AUTO_REFRESH=false
 SI_FINBERT_ENABLED=true
 SI_FINBERT_DEVICE=-1
 ```
@@ -156,10 +165,18 @@ E2E startet das Backend bei Bedarf selbst; bei laufendem Server wird dieser
 wiederverwendet. E2E legt echte Forschungs-Backtests in dessen Demo-Datenbank an.
 Screenshots liegen unter `frontend/test-results/` und sind nicht versioniert.
 
-Für den PostgreSQL-Test nur eine ausdrücklich entbehrliche Testdatenbank
+Für die PostgreSQL-Tests nur eine ausdrücklich entbehrliche Testdatenbank
 verwenden: `SI_TEST_POSTGRES=1` und `DB_*` setzen. CI provisioniert hierfür einen
-eigenen PostgreSQL-Container. Ohne diese Einstellung wird genau dieser Test
+eigenen PostgreSQL-Container. Ohne diese Einstellung werden diese zwei Tests
 übersprungen. News-Unit-Tests verwenden HTTP-Mocks, keine kostenpflichtigen APIs.
+
+## M4.0 – lokale Modellartefakte
+
+Der vorhandene Forschungsweg wird um finale, versionierte LR-/Random-Forest-
+Artefakte und eine kalenderbasierte Aktualitätsprüfung ergänzt. Alle Modelle
+bleiben `research_only`. Kein automatischer Dashboard-Forecast oder Trading.
+Explizite Trainingsgrenzen, lokales Laden und historischer Inferenztest:
+[M4_0_FORECAST_FOUNDATION.md](M4_0_FORECAST_FOUNDATION.md).
 
 ## Docker als Option
 
@@ -177,7 +194,7 @@ keine Trainings-/Importaktionen; sie werden dort explizit per CLI ausgelöst.
   `frontend/dist`-Build ist für den Ein-Server-Modus erforderlich.
 - **Live-Start meldet Migration:** beide oben dokumentierten Migrationsbefehle
   gegen die richtige DB ausführen. Keine automatische Datenlöschung versuchen.
-- **News fehlen:** Live-Modus, Key, Tarif und Watchlist-News-Symbol prüfen.
+- **News fehlen:** News-Aktivierung, Provider-Key, Nutzungsrechte und bestätigte Zuordnung prüfen.
   SAP.DE/ALV.DE haben absichtlich keine ungeprüfte Alpha-Vantage-Zuordnung.
 - **Backtest hat zu wenig Daten:** Standard benötigt 252 Trainingstage,
   63 Kalibrierungstage und mindestens einen Testtag nach Feature-Anlaufphase.

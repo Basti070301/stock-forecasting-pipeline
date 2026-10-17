@@ -15,6 +15,7 @@ Die bestehende Python-Pipeline und ihre Referenzartefakte bleiben erhalten.
 [technischer Bericht und offene Containerprüfungen](docs/M22_REPORT.md).
 **M3 Financial News:** [Provider, lokale Konfiguration und Start](docs/live-news-intelligence.md),
 [Implementierungs- und Testbericht](docs/M3_REPORT.md).
+**M4.0 Forecast-Grundlage:** [Datenvertrag, lokale Modellartefakte und Tests](docs/M4_0_FORECAST_FOUNDATION.md).
 
 Der kostenlose Offline-Start zeigt die echten historischen Repository-Snapshots.
 Live-Daten, News und Prognosen werden nicht simuliert. Next-Day-Modelltraining
