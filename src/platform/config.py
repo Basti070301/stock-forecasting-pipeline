@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     required_schema_version: int = 1
     research_artifact_dir: Path | None = None
     research_trust_local_artifacts: bool = False
+    market_enabled: bool = False
+    market_rights_accepted: bool = False
+    market_rights_reference: str = Field(default="", max_length=240)
+    market_timeout_seconds: int = Field(default=15, ge=1, le=30)
+    market_max_attempts: int = Field(default=3, ge=1, le=3)
+    market_daily_budget: int = Field(default=20, ge=1, le=100)
+    market_min_interval_seconds: float = Field(default=3, ge=1, le=60)
+    market_delay_seconds: int | None = Field(default=None, ge=0, le=86400)
     news_enabled: bool = False
     news_provider: Literal["finnhub", "alpha_vantage", "rss"] = "finnhub"
     finnhub_key: str = ""

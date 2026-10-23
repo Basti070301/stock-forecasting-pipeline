@@ -14,10 +14,10 @@ from .config import DEFAULT_INSTRUMENTS, Settings
 metadata = MetaData()
 
 
-def document_table(name):
+def document_table(name, catalog=metadata):
     return Table(
         name,
-        metadata,
+        catalog,
         Column("id", String(128), primary_key=True),
         Column("mode", String(8), nullable=False, index=True),
         Column("created_at", String(40), nullable=False),

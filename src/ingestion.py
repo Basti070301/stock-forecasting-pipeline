@@ -58,6 +58,11 @@ def save_raw_data(
     return price_file, profile_file
 
 
+def fetch_daily_history(ticker, **options) -> pd.DataFrame:
+    """Shared daily-data request; callers own rights, timing, persistence and retries."""
+    return ticker.history(interval="1d", auto_adjust=True, actions=True, **options)
+
+
 def download_ticker(
     ticker_symbol: str,
     period: str = "5y",
@@ -69,12 +74,7 @@ def download_ticker(
     logging.info("Downloading raw data for %s", ticker_symbol)
 
     ticker = yf.Ticker(ticker_symbol)
-    history = ticker.history(
-        period=period,
-        interval="1d",
-        auto_adjust=True,
-        actions=True,
-    )
+    history = fetch_daily_history(ticker, period=period)
 
     if history.empty:
         raise ValueError(f"No historical price data received for {ticker_symbol}.")
