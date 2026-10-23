@@ -35,4 +35,14 @@ test('frozen local artifact: real research job, replay display, immutable repeat
   await page.getByRole('navigation').getByRole('link', { name: 'Model Analytics', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Eingefrorene Modelle · Holdout-Vergleich' })).toBeVisible();
   await expect(page.getByText(/Projektweit unangetasteter Holdout noch nicht nachgewiesen/)).toBeVisible();
+  const evaluations = await (await request.get('/api/research/evaluations')).json();
+  const diagnostic = evaluations.items.find((r: { evaluation_scope: string }) => r.evaluation_scope === 'retrospective_diagnostic');
+  if (diagnostic) {
+    const comparison = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'Eingefrorene Modelle · Holdout-Vergleich' }) });
+    await expect(comparison.getByText('retrospective_diagnostic', { exact: true })).toBeVisible();
+    await expect(comparison.getByRole('columnheader', { name: 'random_forest', exact: true })).toBeVisible();
+    const accuracy = diagnostic.results[0].metrics.accuracy.toLocaleString('de-DE', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    await expect(comparison.getByRole('cell', { name: accuracy, exact: true }).first()).toBeVisible();
+    await comparison.screenshot({ path: 'test-results/retrospective-diagnostic.png' });
+  }
 });

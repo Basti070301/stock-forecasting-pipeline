@@ -65,13 +65,14 @@ export function HoldoutComparison() {
       <p className="section-note">{query.data?.note}</p>
       {!query.data?.items.length && <Empty>Noch keine bestätigte Holdout-Auswertung gespeichert. Fehlende Ergebnisse werden nicht ersetzt.</Empty>}
       {query.data?.items.map(report => <article key={report.id}>
+        <Badge>{report.evaluation_scope}</Badge>
         <div className="warning-banner">{report.warning} · Unabhängige Abnahme: {report.independent_acceptance}</div>
         <p>Training bis {report.definition.train_end} · Kalibrierung bis {report.definition.calibration_end} · Holdout bis {report.definition.holdout_end}</p>
         <div className="table-scroll"><table><thead><tr><th>Metrik</th>{report.results.map(r => <th key={r.name}>{r.name}</th>)}</tr></thead><tbody>{metricNames.map(key => <tr key={key}><td>{key}</td>{report.results.map(r => <td key={r.name}>{number(r.metrics[key] as number | null, 4)}</td>)}</tr>)}</tbody></table></div>
         {report.results.map(r => <div className="job" key={r.name}><h3>{r.name} · research_only</h3>
           <p>{r.holdout_period.rows} Beobachtungen · Features {r.holdout_period.start} bis {r.holdout_period.end} · letztes Label {r.holdout_period.last_label_session}</p>
           <p>Trainings-Mehrheitsbaseline: Accuracy {number(r.training_majority_baseline.accuracy as number, 4)} · Brier {number(r.training_majority_baseline.brier_score as number, 4)}</p>
-          <p>Trainings-Prävalenzbaseline: Brier {number(r.training_prevalence_baseline.brier_score as number, 4)} · ECE {number(r.calibration_summary.ece, 4)}</p>
+          <p>Trainings-Prävalenzbaseline: Brier {number(r.training_prevalence_baseline.brier_score as number, 4)} · Modell-ECE {number(r.calibration_summary.ece, 4)}</p>
           <p>{r.uncertainty.low_sample ? 'Kleine Stichprobe. ' : ''}{r.uncertainty.warning}</p>
           <details><summary>Unsicherheit, Kalibrierung und Konfusionsmatrix</summary>
             {Object.entries(r.uncertainty.intervals_95).map(([key, interval]) => <p key={key}>{key} · deskriptives 95%-Intervall: {interval.map(n => number(n, 4)).join(' bis ')}</p>)}

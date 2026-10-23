@@ -154,7 +154,7 @@ def evaluate_models(
         "evaluation_code_version": file_hash(__file__),
         "training_code_version": code_version(),
         "definition": definitions[0],
-        "evaluation_scope": "retrospective_reused_period",
+        "evaluation_scope": "retrospective_diagnostic",
         "independent_acceptance": "blocked",
         "warning": REUSE_WARNING,
         "status": "research_only",

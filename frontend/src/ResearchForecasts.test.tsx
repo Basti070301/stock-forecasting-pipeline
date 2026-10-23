@@ -67,10 +67,11 @@ describe('Research forecasts: immutable replay, permission and evaluation disclo
   });
   it('compares models and training baselines with explicit reused-period warning (fixture)', async () => {
     const result = { name: 'logistic', model_version: 'fixture', metrics: { accuracy: .52, confusion_matrix: [[4, 1], [3, 2]] }, holdout_period: { start: '2026-04-01', end: '2026-08-24', last_label_session: '2026-08-25', rows: 10 }, training_majority_baseline: { accuracy: .6, brier_score: .4 }, training_prevalence_baseline: { brier_score: .25 }, calibration_summary: { ece: .1, bins: [] }, uncertainty: { warning: 'Fixture uncertainty only', low_sample: true, intervals_95: { accuracy: [.4, .6] } } };
-    const report: Evaluation = { id: 'fixture-eval', evaluated_at: forecast.generated_at, evaluation_scope: 'retrospective_reused_period', independent_acceptance: 'blocked', warning: 'Testfixture: bereits betrachteter Zeitraum', definition: { train_end: '2025-12-31', calibration_end: '2026-03-31', holdout_end: '2026-08-25' }, results: [result, { ...result, name: 'random_forest' }] };
+    const report: Evaluation = { id: 'fixture-eval', evaluated_at: forecast.generated_at, evaluation_scope: 'retrospective_diagnostic', independent_acceptance: 'blocked', warning: 'Testfixture: bereits betrachteter Zeitraum', definition: { train_end: '2025-12-31', calibration_end: '2026-03-31', holdout_end: '2026-08-25' }, results: [result, { ...result, name: 'random_forest' }] };
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(response({ items: [report], note: 'Fixture' }));
     mount(<HoldoutComparison />);
     expect(await screen.findByText(/Testfixture: bereits betrachteter Zeitraum/)).toBeVisible();
+    expect(screen.getByText('retrospective_diagnostic')).toBeVisible();
     expect(screen.getByRole('columnheader', { name: 'random_forest' })).toBeVisible();
     expect(screen.getAllByText(/Trainings-Mehrheitsbaseline/)).toHaveLength(2);
     expect(screen.getAllByText(/Kleine Stichprobe/)).toHaveLength(2);

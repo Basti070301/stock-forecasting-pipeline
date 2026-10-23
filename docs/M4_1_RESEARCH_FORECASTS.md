@@ -6,38 +6,37 @@ M4.0 wurde nach Diff-, Integritäts- und Gitleaks-Prüfung lokal gesichert:
 (`feat: implement versioned AI forecasting foundation`). Kein Push, Merge oder History-Rewrite.
 Die vorhandenen unversionierten M2.4-/M3.2-Dokumente wurden erhalten und nicht mitcommitted.
 
-## Abnahmestatus und wissenschaftliche Grenze
+## Aktueller Abschlussstand und wissenschaftliche Grenze
 
-**M4.1 ist noch nicht vollständig abgenommen.** Die technische Forecast-Erweiterung
-ist implementiert; ein projektweit unangetasteter Holdout ist nicht nachgewiesen.
+**M4.1 ist technisch abgeschlossen; die unabhängige Modellvalidierung bleibt offen.**
 
-Der eingefrorene Plan beider M4.0-Modelle lautet:
+Die retrospektive Auswertung wurde am 23.10.2026 ausdrücklich genehmigt und als
+`retrospective_diagnostic` ausgeführt. Der vollständige Abschluss mit Ergebnissen,
+Git-Sicherung und aktuellen Tests steht in [M4.1 Abschluss](M4_1_COMPLETION.md).
+Die ursprüngliche Implementierung ist lokal in
+`e04191d6e2819fc5c5a5d972bf6bbe8b02de83eb` gesichert.
 
-| Bereich | Grenze |
-|---|---|
-| Training einschließlich Label | 31.12.2025 |
-| Kalibrierung einschließlich Label | 31.03.2026 |
-| Holdout-Features | ab 01.04.2026, soweit gültige Börsensitzungen vorliegen |
-| Letztes zugelassenes Holdout-Label | 25.08.2026 |
+Der neue versionierte Bericht
+`reports/research/m4_1_retrospective_diagnostic_v1.json` enthält die tatsächlichen
+LR-/RF-Ergebnisse für identische 501 Beobachtungen: Featuretage 01.04.–24.08.2026,
+letztes Label 25.08.2026. Accuracy LR 43,71 %, RF 43,91 %, Trainingsmehrheit 56,29 %.
+Keine Optimierung, kein erneutes Training oder Kalibrieren der eingefrorenen Artefakte.
 
-Dieser Bereich ist vom finalen M4.0-Fit und dessen Kalibrierung ausgeschlossen.
-Allerdings enthält `reports/model_metrics.json` bereits Forschungsergebnisse für
-01.09.2025–24.08.2026. Auch die vorhandenen historischen Walk-Forward-Backtests
-decken diesen Zeitraum ab. Die strengere Forderung „bis dahin unangetastet“
-lässt sich daher nicht mit dieser Datenbasis bestätigen.
+**Die unabhängige Modellvalidierung bleibt offen.** Der Zeitraum wurde bereits in
+`reports/model_metrics.json` (Test 01.09.2025–24.08.2026) und früheren Forschungs-
+Backtests betrachtet. Der alte Preflight-Bericht
+`reports/research/m4_1_holdout_preflight_v1.json` bleibt unverändert als historischer
+Nachweis der damaligen Blockade erhalten. Eine retrospektive Diagnose ist weder
+unabhängige Leistungsbestätigung noch Profitabilitätsnachweis oder Modellfreigabe.
 
-**Keine vollständige LR-/RF-Auswertung dieses Referenz-Holdouts ausgeführt.**
-Accuracy, Balanced Accuracy, Precision, Recall, F1, ROC-AUC, Brier Score,
-Konfusionsmatrix und Baselines sind für diese M4.1-Auswertung noch nicht berechnet.
-Die ursprünglichen PoC-Kennzahlen sind kein Ersatz für eine Evaluation der finalen Modelle.
-Der versionierbare Statusbericht
-`reports/research/m4_1_holdout_preflight_v1.json` enthält deshalb ausdrücklich
-`evaluation_executed=false`, `BLOCKED` und `null` statt erfundener Modellmetriken.
+Der ursprüngliche identische Plan beider Modelle bleibt Training bis 31.12.2025,
+Kalibrierung bis 31.03.2026 und Evaluationslabels bis 25.08.2026. Diese finale
+Trainings-/Kalibrierungstrennung gilt weiter; sie macht den bereits betrachteten
+Zeitraum nicht projektweit unangetastet. Alle Modelle bleiben `research_only`.
 
-Es stehen zwei Entscheidungen offen: ausdrücklich als retrospektiv bezeichnete
-Out-of-Sample-Auswertung des bereits betrachteten Zeitraums erlauben, oder vor
-Beschaffung neuer, tatsächlich ungesehener Daten einen neuen Testplan festschreiben.
-Auch eine erlaubte retrospektive Auswertung würde keine unabhängige Modellfreigabe darstellen.
+Der [prospektive Plan v1](M4_2_PROSPECTIVE_EVALUATION_V1.md) wurde vor Betrachtung der
+retrospektiven Kennzahlen eingefroren. [M4.2](M4_2_CURRENT_MARKET_DATA_PLAN.md) ist
+vorbereitet; noch keine Current-Automatisierung implementiert oder aktiviert.
 
 ## Architektur und Dateien
 
@@ -186,7 +185,7 @@ Zielsitzung, Erstellungszeit, historischer Entscheidungszeitpunkt, Datenstand,
 Herkunft und Versionen werden angezeigt. Model Analytics enthält den separaten
 Holdout-Vergleich mit Leerzustand und wissenschaftlichen Einschränkungen.
 
-## Explizite spätere Evaluation
+## Explizite retrospektive Evaluation
 
 Das neue Modul ruft die bestehende Funktion `evaluate_holdout` auf. LR und RF müssen
 identische Trainings-, Kalibrierungs-, Holdout-, Universums- und Datenstanddefinitionen
@@ -200,22 +199,24 @@ Bootstrap über Sitzungsblöcke von fünf Tagen, alle Titel eines Tages zusammen
 1.000 Wiederholungen, Seed 42. Keine Signifikanz-/Profitabilitätsbehauptung;
 kleine Stichproben und fehlende Regime-/Selektionskorrektur werden ausgewiesen.
 
-**Nur nach ausdrücklicher Entscheidung für die retrospektive Auswertung**, nicht
-als vermeintlich unabhängigen Holdout-Test ausführen:
+Die ausdrückliche Genehmigung liegt jetzt vor; v1 wurde bereits ausgeführt.
+Für eine spätere Wiederholung ausschließlich einen neuen Versionsnamen verwenden
+(hier beispielhaft v2), niemals als unabhängigen Holdout-Test umdeuten:
 
 ```powershell
 .\.venv\Scripts\python.exe -m src.platform.holdout_evaluation `
   --root .runtime/m4/reference-models `
   --artifacts m4-logistic-7a1a9e04acd8586ca379f2f1 m4-random_forest-9bd3dc5bccedd47a2eb9c07c `
   --trust-local-artifacts --acknowledge-reused-period `
-  --output reports/research/m4_1_retrospective_v1.json
+  --output reports/research/m4_1_retrospective_diagnostic_v2.json
 ```
 
 Ausgabedateien werden ausschließlich neu angelegt (`open("x")`), nie überschrieben.
 Der Report bindet Codeversion, Modell-/Datenhashes und Zeitgrenzen. Optionales
 `--persist` schreibt über den bestehenden Store nach `si_backtests` in den bewusst
 konfigurierten lokalen Datenmodus. Ohne Reuse-Bestätigung lehnt die CLI ab.
-Unabhängige Abnahme bleibt auch bei erlaubter retrospektiver Auswertung `blocked`.
+Die Kennzeichnung lautet `retrospective_diagnostic`; unabhängige Abnahme bleibt
+auch bei erlaubter retrospektiver Auswertung `blocked`.
 
 ## Outcome-Vorbereitung
 
@@ -285,12 +286,15 @@ Inserts und Gitleaks (keine Secrets). SHA256-Vergleich bestätigt **124 unverän
 Bestandsdateien**, darunter M4.0-Trainings-/Artefaktmodule, eingefrorene Modelle,
 historische Daten/Referenzmetriken, `.env` und die drei fremden/unversionierten Dokumente.
 Es gibt sechs beabsichtigt geänderte Bestandsdateien und acht neue M4.1-Projektdateien.
-Die 14 M4.1-Dateien sind lokal noch nicht committed; Staging ist leer.
+Die ursprünglichen 14 M4.1-Dateien sind in `e04191d` lokal gesichert.
+Die abschließende Genehmigung, Diagnose und Planungsdokumentation werden separat
+lokal gesichert; kein GitHub-Push. Aktuelle Tests/Dateien siehe Abschlussbericht.
 
 Testgrenzen: Provider-/News-UI-Tests arbeiten weiterhin mit markierten Fixtures;
 die Research-HTTP- und Browser-Prüfungen laden tatsächliche lokale M4.0-Artefakte.
-Eval-Tests verwenden eigene kleine Referenz-Teilmengen und Testmodelle, nicht den
-strittigen vollständigen April–August-Holdout. Ein Test erwartete zunächst einen
+Reproduzierbare Eval-Unit-Tests verwenden eigene kleine Referenz-Teilmengen und
+Testmodelle. Der zusätzlich genehmigte tatsächliche Diagnoselauf mit beiden
+eingefrorenen Artefakten ist im neuen versionierten Bericht separat dokumentiert. Ein Test erwartete zunächst einen
 anderen sicheren Fehlercode für eine beschädigte Registry; die Erwartung wurde an
 den bestehenden Repository-Code `invalid_metadata` angepasst und erneut geprüft.
 Eine vorhandene Starlette/httpx-Deprecation-Warnung bleibt bestehen.
@@ -348,9 +352,8 @@ zum Beenden oder Wiederverwenden anderer Prozesse.
 
 ## Empfehlung für M4.2
 
-1. Holdout-Protokoll verbindlich entscheiden: retrospektive Diagnose separat
-   kennzeichnen und für echte unabhängige Bewertung einen vorher festgeschriebenen,
-   noch nicht betrachteten Zeitraum verwenden. Kein Sieger aus nachträglichem Tuning.
+1. Eingefrorenes Protokoll v1 für neue echte Forecasts beibehalten. Die genehmigte
+   retrospektive Diagnose bleibt separat; keine Modellwahl oder Optimierung aus ihr.
 2. Beobachtungszeitpunkte/Revisionen echter Kursabrufe additiv an die vorhandene
    Pipeline anbinden; Training, Forecasts und Outcomes müssen dieselbe Point-in-Time-
    Datenbasis nachvollziehen können.

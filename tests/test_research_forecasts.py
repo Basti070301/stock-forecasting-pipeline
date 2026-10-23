@@ -263,6 +263,7 @@ def test_frozen_comparison_never_fits_and_uses_same_rows_and_baselines(
         repo, list(hashes), prices, INSTRUMENTS, acknowledge_reused_period=True
     )
     assert report["independent_acceptance"] == "blocked" and not report["forecast_enabled"]
+    assert report["evaluation_scope"] == "retrospective_diagnostic"
     a, b = report["results"]
     assert a["holdout_hash"] == b["holdout_hash"]
     assert a["training_majority_baseline"] == b["training_majority_baseline"]

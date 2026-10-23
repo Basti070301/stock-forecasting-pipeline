@@ -1,3 +1,6 @@
 *.sh text eol=lf
 Dockerfile text eol=lf
 *.yaml text eol=lf
+# Preserve the exact frozen report bytes (including original line endings) for SHA256.
+reports/research/m4_1_retrospective_diagnostic_v1.json -text whitespace=trailing-space,space-before-tab,cr-at-eol
+reports/research/m4_2_prospective_protocol_v1.json -text whitespace=trailing-space,space-before-tab,cr-at-eol

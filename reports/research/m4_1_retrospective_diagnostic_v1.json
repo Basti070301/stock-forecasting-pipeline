@@ -1,0 +1,315 @@
+{
+  "schema_version": 1,
+  "kind": "frozen_holdout_comparison",
+  "evaluation_code_version": "b589b29cfb67576a6f023554dd23f6c96cf6c911715e6dfbb438c395f7954fa0",
+  "training_code_version": "adff76cb2adf334057959917ae3635a769aa5c917d4f63c5cdb5e3609403b4a1",
+  "definition": {
+    "tickers": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "SAP.DE",
+      "ALV.DE"
+    ],
+    "train_end": "2025-12-31",
+    "calibration_end": "2026-03-31",
+    "holdout_end": "2026-08-25",
+    "seed": 42,
+    "publication_delay_seconds": 900
+  },
+  "evaluation_scope": "retrospective_diagnostic",
+  "independent_acceptance": "blocked",
+  "warning": "Retrospektive Out-of-Sample-Auswertung: von Training/Kalibrierung der finalen Modelle ausgeschlossen, aber Zeitraum bereits in früheren Forschungs-Backtests betrachtet. Kein nachgewiesen projektweit unangetasteter Holdout; keine unabhängige Modellfreigabe.",
+  "status": "research_only",
+  "forecast_enabled": false,
+  "results": [
+    {
+      "artifact_id": "m4-logistic-7a1a9e04acd8586ca379f2f1",
+      "model_version": "7a1a9e04acd8586ca379f2f18a684c6e5ae3b7f8ff5a2160baea38b7e369293f",
+      "holdout_hash": "c3fcc920d058b93e93dc183931bc512ee3dcc8c640d521c36bce45247e62e066",
+      "holdout_period": {
+        "start": "2026-04-01",
+        "end": "2026-08-24",
+        "last_label_session": "2026-08-25",
+        "rows": 501,
+        "unique_sessions": 103
+      },
+      "status": "research_only",
+      "forecast_enabled": false,
+      "metrics": {
+        "accuracy": 0.437125748502994,
+        "balanced_accuracy": 0.5,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "roc_auc": 0.5482528579293371,
+        "brier_score": 0.2560829518227378,
+        "confusion_matrix": [
+          [
+            219,
+            0
+          ],
+          [
+            282,
+            0
+          ]
+        ]
+      },
+      "training_prevalence_baseline": {
+        "accuracy": 0.562874251497006,
+        "balanced_accuracy": 0.5,
+        "precision": 0.562874251497006,
+        "recall": 1.0,
+        "f1": 0.7203065134099617,
+        "roc_auc": 0.5,
+        "brier_score": 0.2468924215117411,
+        "confusion_matrix": [
+          [
+            0,
+            219
+          ],
+          [
+            0,
+            282
+          ]
+        ]
+      },
+      "training_majority_baseline": {
+        "accuracy": 0.562874251497006,
+        "balanced_accuracy": 0.5,
+        "precision": 0.562874251497006,
+        "recall": 1.0,
+        "f1": 0.7203065134099617,
+        "roc_auc": 0.5,
+        "brier_score": 0.437125748502994,
+        "confusion_matrix": [
+          [
+            0,
+            219
+          ],
+          [
+            0,
+            282
+          ]
+        ]
+      },
+      "calibration": [
+        {
+          "predicted": 0.4604702994026133,
+          "observed": 0.562874251497006,
+          "count": 501
+        }
+      ],
+      "walk_forward": "Unabhängig im bestehenden Research-Modul auswerten; kein automatischer Modellvergleich/-Promoting",
+      "name": "logistic",
+      "artifact_sha256": "504c50dfeb2091bd87c6ad4045dd02e27a27e871f582962c4c9bed6944f3ad71",
+      "training_period": {
+        "start": "2021-10-06",
+        "end": "2025-12-30",
+        "last_label_session": "2025-12-31",
+        "rows": 5341,
+        "unique_sessions": 1094
+      },
+      "calibration_period": {
+        "start": "2026-01-02",
+        "end": "2026-03-30",
+        "last_label_session": "2026-03-31",
+        "rows": 304,
+        "unique_sessions": 62
+      },
+      "calibration_summary": {
+        "bins": [
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 501,
+            "predicted": 0.4604702994026133,
+            "observed": 0.562874251497006
+          }
+        ],
+        "ece": 0.10240395209439268,
+        "mean_probability": 0.4604702994026133,
+        "positive_rate": 0.562874251497006
+      },
+      "uncertainty": {
+        "method": "Paired circular five-session date-block bootstrap; 1000 draws; seed 42",
+        "intervals_95": {
+          "accuracy": [
+            0.3858196565790722,
+            0.4890045030299643
+          ],
+          "brier_score": [
+            0.2517623200781454,
+            0.2603573139289795
+          ],
+          "accuracy_delta_majority": [
+            -0.22836068684185562,
+            -0.021990993940071427
+          ]
+        },
+        "unique_sessions": 103,
+        "low_sample": false,
+        "warning": "Deskriptive Unsicherheit auf fünf festen Titeln/einem Zeitraum; keine Regime-, Selektions- oder Mehrfachtestkorrektur und kein Profitabilitätsnachweis."
+      },
+      "per_ticker_rows": {
+        "AAPL": 100,
+        "ALV.DE": 100,
+        "MSFT": 100,
+        "NVDA": 100,
+        "SAP.DE": 101
+      }
+    },
+    {
+      "artifact_id": "m4-random_forest-9bd3dc5bccedd47a2eb9c07c",
+      "model_version": "9bd3dc5bccedd47a2eb9c07c56f695c75618f2f810d2edc115b50ee114762bc0",
+      "holdout_hash": "c3fcc920d058b93e93dc183931bc512ee3dcc8c640d521c36bce45247e62e066",
+      "holdout_period": {
+        "start": "2026-04-01",
+        "end": "2026-08-24",
+        "last_label_session": "2026-08-25",
+        "rows": 501,
+        "unique_sessions": 103
+      },
+      "status": "research_only",
+      "forecast_enabled": false,
+      "metrics": {
+        "accuracy": 0.43912175648702595,
+        "balanced_accuracy": 0.50177304964539,
+        "precision": 1.0,
+        "recall": 0.0035460992907801418,
+        "f1": 0.007067137809187279,
+        "roc_auc": 0.5068331228342886,
+        "brier_score": 0.25542640284793994,
+        "confusion_matrix": [
+          [
+            219,
+            0
+          ],
+          [
+            281,
+            1
+          ]
+        ]
+      },
+      "training_prevalence_baseline": {
+        "accuracy": 0.562874251497006,
+        "balanced_accuracy": 0.5,
+        "precision": 0.562874251497006,
+        "recall": 1.0,
+        "f1": 0.7203065134099617,
+        "roc_auc": 0.5,
+        "brier_score": 0.2468924215117411,
+        "confusion_matrix": [
+          [
+            0,
+            219
+          ],
+          [
+            0,
+            282
+          ]
+        ]
+      },
+      "training_majority_baseline": {
+        "accuracy": 0.562874251497006,
+        "balanced_accuracy": 0.5,
+        "precision": 0.562874251497006,
+        "recall": 1.0,
+        "f1": 0.7203065134099617,
+        "roc_auc": 0.5,
+        "brier_score": 0.437125748502994,
+        "confusion_matrix": [
+          [
+            0,
+            219
+          ],
+          [
+            0,
+            282
+          ]
+        ]
+      },
+      "calibration": [
+        {
+          "predicted": 0.4654638526440377,
+          "observed": 0.562,
+          "count": 500
+        },
+        {
+          "predicted": 0.5010437450196773,
+          "observed": 1.0,
+          "count": 1
+        }
+      ],
+      "walk_forward": "Unabhängig im bestehenden Research-Modul auswerten; kein automatischer Modellvergleich/-Promoting",
+      "name": "random_forest",
+      "artifact_sha256": "97d3e0c1ebed1b2d9be59b9ee6e16208de816d23446b50d3fa8338bcf0744614",
+      "training_period": {
+        "start": "2021-10-06",
+        "end": "2025-12-30",
+        "last_label_session": "2025-12-31",
+        "rows": 5341,
+        "unique_sessions": 1094
+      },
+      "calibration_period": {
+        "start": "2026-01-02",
+        "end": "2026-03-30",
+        "last_label_session": "2026-03-31",
+        "rows": 304,
+        "unique_sessions": 62
+      },
+      "calibration_summary": {
+        "bins": [
+          {
+            "lower": 0.4,
+            "upper": 0.5,
+            "count": 500,
+            "predicted": 0.4654638526440377,
+            "observed": 0.562
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.6,
+            "count": 1,
+            "predicted": 0.5010437450196773,
+            "observed": 1.0
+          }
+        ],
+        "ece": 0.09733938110371554,
+        "mean_probability": 0.4655348703932905,
+        "positive_rate": 0.562874251497006
+      },
+      "uncertainty": {
+        "method": "Paired circular five-session date-block bootstrap; 1000 draws; seed 42",
+        "intervals_95": {
+          "accuracy": [
+            0.3865844315047502,
+            0.4931155422446406
+          ],
+          "brier_score": [
+            0.2517423359304621,
+            0.2592154484093805
+          ],
+          "accuracy_delta_majority": [
+            -0.22800866141732284,
+            -0.016088642307493888
+          ]
+        },
+        "unique_sessions": 103,
+        "low_sample": false,
+        "warning": "Deskriptive Unsicherheit auf fünf festen Titeln/einem Zeitraum; keine Regime-, Selektions- oder Mehrfachtestkorrektur und kein Profitabilitätsnachweis."
+      },
+      "per_ticker_rows": {
+        "AAPL": 100,
+        "ALV.DE": 100,
+        "MSFT": 100,
+        "NVDA": 100,
+        "SAP.DE": 101
+      }
+    }
+  ],
+  "model_selection": "Keine Modellwahl oder Optimierung aus dieser Auswertung",
+  "id": "eval-9a8dd3938ca930ab8cee59d078f2864a28d749a5b30e1bf2058d0ee1283ac767",
+  "input_fingerprint": "9a8dd3938ca930ab8cee59d078f2864a28d749a5b30e1bf2058d0ee1283ac767",
+  "evaluated_at": "2026-10-23T17:58:43.995186+00:00"
+}

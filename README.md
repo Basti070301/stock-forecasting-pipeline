@@ -17,6 +17,9 @@ Die bestehende Python-Pipeline und ihre Referenzartefakte bleiben erhalten.
 [Implementierungs- und Testbericht](docs/M3_REPORT.md).
 **M4.0 Forecast-Grundlage:** [Datenvertrag, lokale Modellartefakte und Tests](docs/M4_0_FORECAST_FOUNDATION.md).
 **M4.1 Research Forecasts:** [Geschützte Prognosen, Persistenz und offener Holdout-Nachweis](docs/M4_1_RESEARCH_FORECASTS.md).
+[M4.1 Abschluss und retrospektive Diagnose](docs/M4_1_COMPLETION.md) ·
+[M4.2 Implementierungsplan](docs/M4_2_CURRENT_MARKET_DATA_PLAN.md) ·
+[Prospektives Evaluationsprotokoll v1](docs/M4_2_PROSPECTIVE_EVALUATION_V1.md).
 
 Der kostenlose Offline-Start zeigt die echten historischen Repository-Snapshots.
 Live-Daten, News und Prognosen werden nicht simuliert. Next-Day-Modelltraining
