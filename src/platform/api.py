@@ -17,12 +17,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from src.config import PROJECT_ROOT
 
 from .config import Instrument, Settings
+from .forecast_contract import ForecastError, utc, utc_now
 from .jobs import Jobs
 from .market import MarketService, records
 from .news import analyze_pending
 from .news_engine import NewsEngine, stamp
 from .news_scheduler import NewsScheduler
 from .research import BacktestRequest, evaluate
+from .research_forecasts import ForecastRequest, ResearchForecastEngine
 from .store import TABLES, Store
 
 
@@ -77,6 +79,10 @@ def create_app(settings=None, store=None):
             status_code=503,
             content={"detail": "Datenbank nicht verfügbar. Verbindung und Migration prüfen."},
         )
+
+    @app.exception_handler(ForecastError)
+    async def forecast_error(request, exc):
+        return JSONResponse(status_code=409, content={"detail": str(exc), "code": exc.code})
 
     @app.middleware("http")
     async def response_headers(request, call_next):
@@ -365,18 +371,73 @@ def create_app(settings=None, store=None):
         ]
 
     @app.get("/api/forecasts")
-    def forecasts():
-        outcomes = {o["forecast_id"]: o for o in state().list("outcomes")}
+    def forecasts(
+        ticker: str | None = None,
+        limit: int = Query(50, ge=1, le=1000),
+        kind: Literal["research_forecast"] | None = None,
+    ):
+        if ticker:
+            instrument(ticker)
+        now = utc(utc_now())
+        outcomes = {}
+        for outcome in state().all("outcomes"):
+            # A future timestamp, including observation/computation, must never leak.
+            if all(
+                not outcome.get(key) or utc(outcome[key]) <= now
+                for key in ("outcome_at", "observed_at", "calculated_at")
+            ):
+                outcomes[outcome["forecast_id"]] = outcome
+        rows = [
+            f
+            for f in state().list("forecasts", 10000)
+            if (not ticker or f["ticker"] == ticker) and (not kind or f.get("kind") == kind)
+        ]
         return {
-            "items": [{**f, "outcome": outcomes.get(f["id"])} for f in state().list("forecasts")],
+            "items": [{**f, "outcome": outcomes.get(f["id"])} for f in rows[:limit]],
             "status": "Keine Modelle freigegeben. Kalibrierte Backtestwerte bleiben Forschungsergebnisse.",
         }
+
+    @app.get("/api/research/models")
+    def research_models():
+        return {
+            "items": ResearchForecastEngine(state()).catalog(),
+            "can_generate": settings.allow_mutations and settings.research_trust_local_artifacts,
+            "note": "Explizite Artefaktwahl; nur Forschung. Aktuelle Kurse mit belegter Beobachtung fehlen derzeit.",
+        }
+
+    @app.get("/api/research/evaluations")
+    def research_evaluations():
+        return {
+            "items": [
+                b for b in state().all("backtests") if b.get("kind") == "frozen_holdout_comparison"
+            ],
+            "note": "Projektweit unangetasteter Holdout noch nicht nachgewiesen; unabhängige Abnahme offen.",
+        }
+
+    @app.post("/api/forecasts/research", status_code=202, dependencies=[Depends(authorize)])
+    def research_forecast(body: ForecastRequest):
+        engine = ResearchForecastEngine(state())
+        prepared = engine.prepare(body)
+        owner = engine.claim(body.identity())
+
+        def run():
+            try:
+                return engine.run_prepared(body, prepared)
+            finally:
+                engine.release(body.identity(), owner)
+
+        try:
+            return submit("research_forecast", run)
+        except Exception:
+            engine.release(body.identity(), owner)
+            raise
 
     @app.get("/api/backtests")
     def backtests():
         return [
             {k: v for k, v in b.items() if k != "predictions"}
             for b in state().list("backtests", 50)
+            if b.get("kind") != "frozen_holdout_comparison"
         ]
 
     @app.get("/api/backtests/{identity}")

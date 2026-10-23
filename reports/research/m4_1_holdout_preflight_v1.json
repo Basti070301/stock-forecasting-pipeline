@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "report_version": "m4.1-holdout-preflight-v1",
+  "audited_date": "2026-10-23",
+  "m4_foundation_commit": "341fb6d388df84647812df398866ec293dcdc74f",
+  "status": "BLOCKED",
+  "independent_acceptance": "blocked",
+  "evaluation_executed": false,
+  "reason": "Requested April-August 2026 period overlaps previously inspected research test data; project-wide untouched holdout cannot be established.",
+  "evidence": {
+    "path": "reports/model_metrics.json",
+    "sha256": "3392829e6b22d1d569ba0bf7b2662a15a890d3818394439705cf40a9b57608c9",
+    "test_start": "2025-09-01",
+    "test_end": "2026-08-24"
+  },
+  "next_decision": "User confirmation required for explicitly retrospective reused-period analysis, or define genuinely unseen data and freeze the evaluation protocol before retrieval.",
+  "models": [
+    {
+      "artifact_id": "m4-logistic-7a1a9e04acd8586ca379f2f1",
+      "model_version": "7a1a9e04acd8586ca379f2f18a684c6e5ae3b7f8ff5a2160baea38b7e369293f",
+      "artifact_sha256": "504c50dfeb2091bd87c6ad4045dd02e27a27e871f582962c4c9bed6944f3ad71",
+      "training_spec": {
+        "model": "logistic",
+        "tickers": [
+          "AAPL",
+          "MSFT",
+          "NVDA",
+          "SAP.DE",
+          "ALV.DE"
+        ],
+        "train_end": "2025-12-31",
+        "calibration_end": "2026-03-31",
+        "holdout_end": "2026-08-25",
+        "seed": 42,
+        "publication_delay_seconds": 900
+      },
+      "metrics": null,
+      "baseline_metrics": null
+    },
+    {
+      "artifact_id": "m4-random_forest-9bd3dc5bccedd47a2eb9c07c",
+      "model_version": "9bd3dc5bccedd47a2eb9c07c56f695c75618f2f810d2edc115b50ee114762bc0",
+      "artifact_sha256": "97d3e0c1ebed1b2d9be59b9ee6e16208de816d23446b50d3fa8338bcf0744614",
+      "training_spec": {
+        "model": "random_forest",
+        "tickers": [
+          "AAPL",
+          "MSFT",
+          "NVDA",
+          "SAP.DE",
+          "ALV.DE"
+        ],
+        "train_end": "2025-12-31",
+        "calibration_end": "2026-03-31",
+        "holdout_end": "2026-08-25",
+        "seed": 42,
+        "publication_delay_seconds": 900
+      },
+      "metrics": null,
+      "baseline_metrics": null
+    }
+  ],
+  "model_selection": "none",
+  "forecast_enabled": false
+}

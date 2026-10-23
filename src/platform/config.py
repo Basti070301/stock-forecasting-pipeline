@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     allow_mutations: bool = True
     proxy_token: str = ""
     required_schema_version: int = 1
+    research_artifact_dir: Path | None = None
+    research_trust_local_artifacts: bool = False
     news_enabled: bool = False
     news_provider: Literal["finnhub", "alpha_vantage", "rss"] = "finnhub"
     finnhub_key: str = ""
