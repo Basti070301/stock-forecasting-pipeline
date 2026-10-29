@@ -6,6 +6,7 @@ import { api, dateText, number, percent, setToken, type Backtest, type Bar as Pr
 
 import { NewsWorkspace, StockNewsPanel, MarketNewsOverview } from './NewsIntelligence';
 import { ResearchForecastPanel, HoldoutComparison } from './ResearchForecasts';
+import { CurrentResearchStatus } from './CurrentResearchStatus';
 
 const navigation = [
   ['dashboard', 'Übersicht', LayoutDashboard], ['radar', 'Stock Radar', Radar],
@@ -95,7 +96,7 @@ function Dashboard({ radarOnly }: { radarOnly: boolean }) {
   <Section title="Stock Radar" subtitle="Deine Watchlist. Nach nachvollziehbaren Signalen geordnet." action={<Badge><span className="status-dot amber" /> Tagesdaten</Badge>}>
     <div className="filters"><div className="segmented">{[['', 'Alle Märkte'], ['USA', 'USA'], ['Europa', 'Europa']].map(([v, l]) => <button key={v} className={region === v ? 'selected' : ''} onClick={() => setRegion(v)}>{l}</button>)}</div><select aria-label="Handelsplatz" value={exchange} onChange={e => setExchange(e.target.value)}><option value="">Alle Handelsplätze</option>{[...new Set(all.map(s => s.exchange))].map(s => <option key={s}>{s}</option>)}</select><select aria-label="Sektor" value={sector} onChange={e => setSector(e.target.value)}><option value="">Alle Sektoren</option>{[...new Set(all.map(s => s.sector))].map(s => <option key={s}>{s}</option>)}</select><select aria-label="Sentiment" value={sentiment} onChange={e => setSentiment(e.target.value)}><option value="">Alle Sentiments</option><option value="positive">Positiv</option><option value="negative">Negativ</option><option value="missing">Nicht verfügbar</option></select><select aria-label="News-Zeitraum" value={days} onChange={e => setDays(e.target.value)}><option value="1">News: 24 Stunden</option><option value="7">News: 7 Tage</option><option value="30">News: 30 Tage</option></select>{radarOnly && <><select aria-label="Prognosehorizont" value={horizon} onChange={e => setHorizon(e.target.value)}><option value="all">Alle Horizonte</option><option value="next_day">Next-Day</option><option value="60m">60 Handelsminuten</option><option value="120m">120 Handelsminuten</option></select><select aria-label="Modellfilter" value={model} onChange={e => setModel(e.target.value)}><option value="all">Alle Modelle</option><option value="logistic">Logistische Regression</option><option value="random_forest">Random Forest</option></select></>}</div>
     <QueryState pending={radar.isPending} error={radar.error}>{rows.length ? <RadarTable stocks={rows} /> : <Empty>Für diese Filter sind keine Signale verfügbar. Prognosefilter benötigen freigegebene Modelle.</Empty>}</QueryState><div className="table-footer"><span>{rows.length} Titel · {radar.data?.note}</span><BookOpen size={16} /></div>
-  </Section>{!radarOnly && <MarketNewsOverview />}</>;
+  </Section>{!radarOnly && <><MarketNewsOverview /><CurrentResearchStatus /></>}</>;
 }
 
 export function RadarTable({ stocks }: { stocks: Stock[] }) {

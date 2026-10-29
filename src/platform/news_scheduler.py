@@ -32,16 +32,21 @@ class NewsScheduler:
         return True
 
     def run(self):
-        settings = self.store.settings
-        for cycle in range(settings.news_max_cycles):
+        for cycle in range(self.max_cycles):
             if self.stop_event.is_set():
                 break
             self.tick()
             self.cycles += 1
-            if cycle + 1 < settings.news_max_cycles and self.stop_event.wait(
-                settings.news_interval_seconds
-            ):
+            if cycle + 1 < self.max_cycles and self.stop_event.wait(self.interval_seconds):
                 break
+
+    @property
+    def max_cycles(self):
+        return self.store.settings.news_max_cycles
+
+    @property
+    def interval_seconds(self):
+        return self.store.settings.news_interval_seconds
 
     def close(self):
         self.stop_event.set()

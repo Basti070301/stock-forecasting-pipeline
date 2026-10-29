@@ -10,13 +10,20 @@ import pandas as pd
 
 from .config import Settings
 from .forecast_contract import utc_now
-from .market_data_provider import INSTRUMENTS, MarketDataError, YahooDailyProvider, checksum, stamp
+from .market_data_provider import (
+    INSTRUMENTS,
+    DailyProvider,
+    MarketDataError,
+    YahooDailyProvider,
+    checksum,
+    stamp,
+)
 from .market_data_store import MarketRepository
 from .store import Store
 
 
 class MarketIngestion:
-    def __init__(self, repository, provider, clock=utc_now, sleep=time.sleep):
+    def __init__(self, repository, provider: DailyProvider, clock=utc_now, sleep=time.sleep):
         self.repo, self.provider, self.clock, self.sleep = repository, provider, clock, sleep
         self.settings = repository.store.settings
 

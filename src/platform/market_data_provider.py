@@ -4,7 +4,7 @@ import hashlib
 import json
 from datetime import date, timedelta, timezone
 from importlib.metadata import version
-from typing import Literal
+from typing import Literal, Protocol
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -43,6 +43,16 @@ class MarketDataError(ValueError):
     def __init__(self, code, message, *, retryable=False, cooldown=60):
         super().__init__(message)
         self.code, self.retryable, self.cooldown = code, retryable, cooldown
+
+
+class DailyProvider(Protocol):
+    """History adapters must return receipts, not unversioned price arrays."""
+
+    name: str
+
+    def configured_reason(self) -> str | None: ...
+
+    def fetch(self, ticker: str, start: date, end: date) -> "MarketReceipt": ...
 
 
 class MarketReceipt(BaseModel):

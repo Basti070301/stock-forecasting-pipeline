@@ -10,19 +10,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.config import PROJECT_ROOT
 
 from .config import Instrument, Settings
+from .current_forecasts import CurrentForecastPipeline
+from .current_scheduler import CurrentScheduler
 from .forecast_contract import ForecastError, utc, utc_now
 from .jobs import Jobs
 from .market import MarketService, records
 from .news import analyze_pending
 from .news_engine import NewsEngine, stamp
 from .news_scheduler import NewsScheduler
+from .prospective import current_status
 from .research import BacktestRequest, evaluate
 from .research_forecasts import ForecastRequest, ResearchForecastEngine
 from .store import TABLES, Store
@@ -30,6 +33,14 @@ from .store import TABLES, Store
 
 class NewsRequest(BaseModel):
     ticker: str | None = None
+
+
+class CurrentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tickers: list[Literal["AAPL", "MSFT", "NVDA", "SAP.DE", "ALV.DE"]] = Field(
+        default=["AAPL", "MSFT", "NVDA", "SAP.DE", "ALV.DE"], min_length=1, max_length=5
+    )
+    refresh: bool = Field(default=False, strict=True)
 
 
 def create_app(settings=None, store=None):
@@ -50,7 +61,10 @@ def create_app(settings=None, store=None):
         app.state.jobs = Jobs(app.state.store) if settings.allow_mutations else None
         app.state.news_scheduler = NewsScheduler(app.state.store, app.state.jobs)
         app.state.news_scheduler.start()
+        app.state.current_scheduler = CurrentScheduler(app.state.store, app.state.jobs)
+        app.state.current_scheduler.start()
         yield
+        app.state.current_scheduler.close()
         app.state.news_scheduler.close()
         if app.state.jobs is not None:
             app.state.jobs.close()
@@ -390,10 +404,21 @@ def create_app(settings=None, store=None):
         rows = [
             f
             for f in state().list("forecasts", 10000)
-            if (not ticker or f["ticker"] == ticker) and (not kind or f.get("kind") == kind)
+            if (not ticker or f["ticker"] == ticker)
+            and (not kind or f.get("kind") == kind)
+            and (not f.get("generated_at") or utc(f["generated_at"]) <= now)
         ]
         return {
-            "items": [{**f, "outcome": outcomes.get(f["id"])} for f in rows[:limit]],
+            "items": [
+                {
+                    **f,
+                    "outcome": outcomes.get(f["id"]),
+                    "current_confirmation": state().get("market_runs", f["pipeline_slot"])
+                    if f.get("pipeline_slot")
+                    else None,
+                }
+                for f in rows[:limit]
+            ],
             "status": "Keine Modelle freigegeben. Kalibrierte Backtestwerte bleiben Forschungsergebnisse.",
         }
 
@@ -402,8 +427,31 @@ def create_app(settings=None, store=None):
         return {
             "items": ResearchForecastEngine(state()).catalog(),
             "can_generate": settings.allow_mutations and settings.research_trust_local_artifacts,
-            "note": "Explizite Artefaktwahl; nur Forschung. Aktuelle Kurse mit belegter Beobachtung fehlen derzeit.",
+            "note": "Explizite Artefaktwahl; nur Forschung. Current Research benötigt den getrennten kontrollierten Ablauf und bestätigte Datenabnahme.",
         }
+
+    @app.get("/api/research/current/status")
+    def current_research_status(ticker: str | None = None):
+        if ticker:
+            instrument(ticker)
+            if ticker not in {"AAPL", "MSFT", "NVDA", "SAP.DE", "ALV.DE"}:
+                raise HTTPException(404, "Aktie gehört nicht zum fixierten Forschungsuniversum")
+        result = current_status(CurrentForecastPipeline(state()), ticker)
+        scheduler = app.state.current_scheduler
+        result["scheduler"] = {
+            "running": bool(scheduler.thread and scheduler.thread.is_alive()),
+            "cycles": scheduler.cycles,
+            "blocked_code": scheduler.blocked_code,
+        }
+        return result
+
+    @app.post("/api/forecasts/current", status_code=202, dependencies=[Depends(authorize)])
+    def current_research_forecasts(body: CurrentRequest):
+        pipeline = CurrentForecastPipeline(state())
+        pipeline.gate()
+        if len(set(body.tickers)) != len(body.tickers):
+            raise HTTPException(422, "Doppelte Aktien nicht zulässig")
+        return submit("current-research", lambda: pipeline.job(body.tickers, refresh=body.refresh))
 
     @app.get("/api/research/evaluations")
     def research_evaluations():
@@ -437,7 +485,7 @@ def create_app(settings=None, store=None):
         return [
             {k: v for k, v in b.items() if k != "predictions"}
             for b in state().list("backtests", 50)
-            if b.get("kind") != "frozen_holdout_comparison"
+            if b.get("kind") not in {"frozen_holdout_comparison", "current_pipeline_validation"}
         ]
 
     @app.get("/api/backtests/{identity}")

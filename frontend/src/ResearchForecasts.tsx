@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, dateText, number, percent, type Metrics } from './api';
 import { Action, Badge, Empty, QueryState, Section } from './App';
+import { CurrentResearchStatus } from './CurrentResearchStatus';
 
 export type ResearchForecast = {
   id: string; ticker: string; probability: number; model_name: string; model_version: string;
   generated_at: string; decision_at: string; feature_as_of: string; target_session: string;
   mode: string; counterfactual_model_replay: boolean; status: string;
   source: { name: string; observed_at: string }; data_version: string;
+  source_kind?: string; evaluation_scope?: string;
+  current_confirmation?: { status: string; saved_at: string } | null;
+  outcome?: { actual: number; observed_at: string; prediction_correct?: boolean; market_evidence?: { target_revision_id: string } } | null;
 };
 type Artifact = { artifact_id: string; model_version: string; name: string; tickers: string[] };
 type Catalog = { items: Artifact[]; can_generate: boolean; note: string };
@@ -22,13 +26,15 @@ export type Evaluation = { id: string; evaluated_at: string; evaluation_scope: s
 export function ForecastCard({ forecast: f }: { forecast: ResearchForecast }) {
   return <article className="job">
     <div className="job-top"><strong>{f.ticker} · {f.model_name}</strong><Badge>research_only</Badge>
-      <Badge color="amber-badge">{f.mode === 'historical_replay' ? 'Historischer Research Replay' : 'Current Research Forecast'}</Badge></div>
+      <Badge color="amber-badge">{f.source_kind === 'fixture' || f.evaluation_scope === 'fixture' ? 'Fixture · keine Live-Prognose' : f.mode === 'historical_replay' ? 'Historischer Research Replay' : f.current_confirmation?.status === 'confirmed' ? 'Current Research Forecast · bestätigt' : 'Current Research Forecast · unbestätigt'}</Badge></div>
     {f.counterfactual_model_replay && <p className="warning-banner">Kontrafaktischer Replay · Modell erst später erstellt; keine damals erzeugte Prognose.</p>}
     <p>Zielklasse: <strong>Close(t+1) &gt; Close(t)</strong> · Kalibrierte Wahrscheinlichkeit: <strong>{percent(f.probability)}</strong></p>
     <p>Modellklassifikation (Schwelle 0,5): {f.probability >= .5 ? 'Klasse 1 · Schlusskurs steigt' : 'Klasse 0 · Schlusskurs steigt nicht'}</p>
     <p>Erstellt: {new Date(f.generated_at).toLocaleString('de-DE')} · Zielhandelstag: {dateText(f.target_session)}</p>
     <p>Datenstand: {dateText(f.feature_as_of)} · Entscheidung: {new Date(f.decision_at).toLocaleString('de-DE')}</p>
     <p>Quelle: {f.source.name} · Beobachtet: {new Date(f.source.observed_at).toLocaleString('de-DE')}</p>
+    {f.current_confirmation && <p>Forecast-Speicherung bestätigt: {new Date(f.current_confirmation.saved_at).toLocaleString('de-DE')} · {f.current_confirmation.status}</p>}
+    {f.outcome && <p>Beobachtetes Ergebnis: Klasse {f.outcome.actual} · {new Date(f.outcome.observed_at).toLocaleString('de-DE')}{f.outcome.prediction_correct != null && ` · Prognose ${f.outcome.prediction_correct ? 'korrekt' : 'nicht korrekt'}`}</p>}
     <details><summary>Version und Datenbasis</summary><p className="hash">Modellversion: {f.model_version}</p><p className="hash">Datenversion: {f.data_version}</p></details>
     <p className="section-note">Wahrscheinlichkeit der definierten Richtungsklasse. Keine Renditewahrscheinlichkeit, Modellfreigabe oder Handelsempfehlung.</p>
   </article>;
@@ -42,7 +48,7 @@ export function ResearchForecastPanel({ ticker }: { ticker: string }) {
   const [decision, setDecision] = useState('');
   const model = catalog.data?.items.find(a => a.artifact_id === identity && a.tickers.includes(ticker));
   const validTime = Number.isFinite(Date.parse(decision)) && /(?:Z|[+-]\d\d:\d\d)$/.test(decision);
-  return <Section title="Research-Prognosen" subtitle="Explizite Modellwahl · nächste Handelssitzung · unveränderliche Ergebnisse">
+  return <><CurrentResearchStatus ticker={ticker} /><Section title="Research-Prognosen" subtitle="Explizite Modellwahl · nächste Handelssitzung · unveränderliche Ergebnisse">
     <QueryState pending={forecasts.isPending} error={forecasts.error}>
       {forecasts.data?.items.length ? forecasts.data.items.map(f => <ForecastCard key={f.id} forecast={f} />) : <Empty>Für {ticker} ist noch keine Research-Prognose gespeichert. Historische Kurse erzeugen keine aktuelle Prognose.</Empty>}
     </QueryState>
@@ -54,7 +60,7 @@ export function ResearchForecastPanel({ ticker }: { ticker: string }) {
         <label>Entscheidungszeitpunkt (ISO mit Zeitzone)<input placeholder="z. B. 2026-08-25T21:45:00Z" value={decision} onChange={e => setDecision(e.target.value)} /></label>
       </div><Action label="Research-Prognose ausdrücklich erstellen" path="/forecasts/research" disabled={!model || !validTime} body={{ artifact_id: model?.artifact_id, model_version: model?.model_version, ticker, mode, decision_at: decision }} /></> : <p className="section-note">Prognoseerstellung gesperrt. Mutationsberechtigung und Vertrauen in lokale Artefakte müssen serverseitig eingerichtet sein.</p>}
     </QueryState>
-  </Section>;
+  </Section></>;
 }
 
 export function HoldoutComparison() {

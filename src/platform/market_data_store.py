@@ -212,6 +212,12 @@ class MarketRepository:
                 "unavailable", "Keine damals empfangene und bestätigt gespeicherte Kursbeobachtung"
             )
         receipt = observations[-1]
+        tied = [r for r in observations if stamp(r["received_at"]) == stamp(receipt["received_at"])]
+        if len({(r["payload_sha256"], r["source_kind"], r["adjustment"]) for r in tied}) > 1:
+            raise MarketDataError(
+                "ambiguous_observation",
+                "Gleichzeitige abweichende Beobachtungen haben keine belegbare Reihenfolge; erneuten kontrollierten Abruf durchführen",
+            )
         if receipt["quality"]["status"] != "accepted":
             raise MarketDataError(
                 "quality", "Neueste verfügbare Beobachtung verletzt die Datenqualität"

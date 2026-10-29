@@ -244,6 +244,13 @@ class ResearchForecastEngine:
                     "Abweichende Eingaben für gespeicherte Prognose; Original bleibt unverändert",
                 )
             return {"forecast_id": identity, "reused": True}
+        saved = immutable_documents(self.store, self.prediction_documents(request, prepared))
+        return {"forecast_id": saved["forecasts"]["id"], "reused": False}
+
+    def prediction_documents(self, request, prepared):
+        """Build verified predictions without committing; supports atomic paired research jobs."""
+        meta, snapshot, fingerprint = prepared
+        identity = request.identity()
         loaded = self.repository.load(
             request.artifact_id, trusted=True, expected_version=request.model_version
         )
@@ -284,17 +291,12 @@ class ResearchForecastEngine:
             "input_fingerprint": canonical_hash(meta.model_dump(mode="json")),
             "warning": "Eingefrorenes Forschungsartefakt; keine operative Freigabe",
         }
-        saved = immutable_documents(
-            self.store,
-            [
-                ("models", request.artifact_id, model),
-                ("forecasts", identity, payload),
-            ],
-        )
-        return {"forecast_id": saved["forecasts"]["id"], "reused": False}
+        return [("models", request.artifact_id, model), ("forecasts", identity, payload)]
 
 
-def record_outcome(store, forecast_id, prices, source, *, clock=utc_now):
+def record_outcome(
+    store, forecast_id, prices, source, *, clock=utc_now, persist=True, evidence=None
+):
     """Explicit validated preparation only; no API trigger, scheduler or fake future result."""
     original = store.get("forecasts", forecast_id)
     if not original or original.get("kind") != "research_forecast":
@@ -338,7 +340,13 @@ def record_outcome(store, forecast_id, prices, source, *, clock=utc_now):
         "calculated_at": now.isoformat(),
         "source": source.model_dump(mode="json"),
     }
+    if evidence is not None:
+        payload["market_evidence"] = evidence
     payload["input_fingerprint"] = canonical_hash(
         {k: v for k, v in payload.items() if k != "calculated_at"}
     )
-    return immutable_documents(store, [("outcomes", forecast_id, payload)])["outcomes"]
+    return (
+        immutable_documents(store, [("outcomes", forecast_id, payload)])["outcomes"]
+        if persist
+        else payload
+    )

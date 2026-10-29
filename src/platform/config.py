@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     market_daily_budget: int = Field(default=20, ge=1, le=100)
     market_min_interval_seconds: float = Field(default=3, ge=1, le=60)
     market_delay_seconds: int | None = Field(default=None, ge=0, le=86400)
+    current_enabled: bool = False
+    current_acceptance_id: str = Field(default="", max_length=100)
+    current_auto_refresh: bool = False
+    current_interval_seconds: int = Field(default=900, ge=60, le=86400)
+    current_max_cycles: int = Field(default=24, ge=1, le=288)
+    current_session_attempts: int = Field(default=3, ge=1, le=3)
     news_enabled: bool = False
     news_provider: Literal["finnhub", "alpha_vantage", "rss"] = "finnhub"
     finnhub_key: str = ""
