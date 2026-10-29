@@ -29,12 +29,20 @@ def maintenance(command, env_file=".env.docker", capture=False):
         values["COMPOSE_PROJECT_NAME"],
         "-f",
         "compose.yaml",
-        "run",
+    ]
+    preview = values.get("SI_DEPLOYMENT_PROFILE") == "historical-preview"
+    if preview:
+        if not values["COMPOSE_PROJECT_NAME"].startswith("stockintelligence-m43-test") or values.get("SI_BIND_IP") != "127.0.0.1":
+            raise ValueError("Preview-Wartung nur im eigenen Loopback-Testprojekt")
+        args += ["-f", "compose.preview.yaml"]
+    if command in {"prepare-research", "replay-research", "seed-reports", "verify-preview"} and not preview:
+        raise ValueError("Dieser Befehl benötigt das explizite historische Preview-Profil")
+    args += ["run",
         "--rm",
         "--no-deps",
         "-T",
     ]
-    if command in {"init-db", "import-reference", "analyze-news"}:
+    if command in {"init-db", "import-reference", "analyze-news", "replay-research", "seed-reports", "verify-preview"}:
         environment["DB_ADMIN_PASSWORD"] = values["SI_DB_ADMIN_PASSWORD"]
         args += ["-e", "DB_ADMIN_PASSWORD"]
     if command == "download-model":
@@ -57,6 +65,10 @@ if __name__ == "__main__":
             "check-model",
             "check-writes",
             "analyze-news",
+            "prepare-research",
+            "replay-research",
+            "seed-reports",
+            "verify-preview",
         ],
     )
     parser.add_argument("--env-file", default=".env.docker")

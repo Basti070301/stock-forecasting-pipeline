@@ -1,5 +1,10 @@
 # M2.2 – Docker und Portainer
 
+Aktueller historischer Teststand: [M4.3 Docker Preview](M4_3_DOCKER_PREVIEW.md).
+Dort stehen die M4-Migrationen, Offline-Research-Artefakte, Port 8086 und die
+inzwischen praktisch ausgeführten lokalen Containerprüfungen. Die folgenden
+M2.2-Angaben beschreiben die ursprüngliche Basiskonfiguration auf Port 8085.
+
 Stand: 09.10.2026. Vorbereitet für eine private Ubuntu-VM auf Proxmox,
 Docker Standalone/Compose und Portainer. Kein Deployment auf einem realen
 Server vorgenommen. **Containerlaufzeit noch nicht abgenommen:** der lokale

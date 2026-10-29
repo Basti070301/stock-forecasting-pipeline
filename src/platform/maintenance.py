@@ -43,7 +43,7 @@ def migrate(engine, reader_password=None):
                     text("INSERT INTO si_deployment_migrations (version, sha256) VALUES (:v,:h)"),
                     {"v": path.name, "h": checksum},
                 )
-        for version in (1, 2, 3):
+        for version in (1, 2, 3, 4):
             conn.execute(
                 insert(TABLES["schema_versions"])
                 .values(
@@ -211,13 +211,28 @@ def main():
             "check-model",
             "check-writes",
             "analyze-news",
+            "prepare-research",
+            "replay-research",
+            "seed-reports",
+            "verify-preview",
         ],
     )
     parser.add_argument("--raw", type=Path)
     args = parser.parse_args()
     engine = None
     try:
-        if args.command in {"init-db", "import-reference", "analyze-news"}:
+        if args.command in {
+            "init-db",
+            "import-reference",
+            "analyze-news",
+            "replay-research",
+            "seed-reports",
+            "verify-preview",
+        }:
+            if args.command in {"replay-research", "seed-reports", "verify-preview"}:
+                from .docker_preview import require_preview
+
+                require_preview(Settings())
             reader_password = os.environ.get("DB_PASSWORD")
             admin_password = os.environ.get("DB_ADMIN_PASSWORD")
             if not admin_password:
@@ -228,13 +243,31 @@ def main():
             engine = get_engine()
             if args.command == "init-db":
                 migrate(engine, reader_password)
-                result = {"schema_version": 3}
+                result = {"schema_version": 4}
             elif args.command == "import-reference":
+                if Settings().historical_preview:
+                    from .docker_preview import seed_reference_files
+
+                    seed_reference_files(args.raw)
                 result = import_reference(engine, args.raw)
+            elif args.command in {"replay-research", "seed-reports", "verify-preview"}:
+                from .docker_preview import replay_research, seed_reports, verify_preview
+
+                result = {
+                    "replay-research": replay_research,
+                    "seed-reports": seed_reports,
+                    "verify-preview": verify_preview,
+                }[args.command](Settings(), engine)
             else:
                 from .news import analyze_pending
 
                 result = analyze_pending(Store(Settings(mode="live"), engine=engine))
+        elif args.command == "prepare-research":
+            from .docker_preview import prepare_research, require_preview, seed_reference_files
+
+            require_preview(Settings())
+            seed_reference_files(args.raw)
+            result = prepare_research(Settings())
         elif args.command == "download-model":
             if os.environ.get("HF_HUB_OFFLINE", "0") != "0":
                 raise ValueError("Download explizit mit HF_HUB_OFFLINE=0 erlauben")

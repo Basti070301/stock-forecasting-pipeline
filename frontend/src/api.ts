@@ -20,7 +20,7 @@ export type Metrics = Record<string, number | number[][] | string | null>;
 export type Model = { id: string; name: string; metrics: Metrics; calibration_period?: { start: string; end: string }; calibrated: boolean; forecast_enabled: boolean; warning: string; created_at?: string; folds?: { train_start: string; train_end: string; test_start: string; test_end: string }[]; calibration?: { predicted: number; observed: number; count: number }[]; feature_importance?: { feature: string; value: number }[] };
 export type Backtest = { id: string; created_at: string; request: { model: string; start: string; end: string }; metrics: Metrics; naive_metrics: Metrics; equity: { date: string; value: number }[]; test_rows: number; folds: unknown[]; round_trip_cost_bps: number; data_hash: string; limitations: string[] };
 export type Job = { steps?: { name: string; status: string; rows?: number }[]; id: string; kind: string; status: string; started_at: string | null; finished_at: string | null; error: string | null; result: { rows?: number; test_rows?: number; backtest_id?: string; partial?: boolean; steps?: { name: string; status: string }[] } | null };
-export type Config = { mode: string; watchlist: Stock[]; providers: { name: string; status: string }[]; token_required: boolean; intraday: string; allow_mutations?: boolean };
+export type Config = { mode: string; data_profile?: string; watchlist: Stock[]; providers: { name: string; status: string }[]; token_required: boolean; intraday: string; allow_mutations?: boolean };
 export let mutationToken = '';
 export function setToken(value: string) { mutationToken = value; }
 export async function api<T>(path: string, body?: unknown): Promise<T> {

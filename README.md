@@ -22,6 +22,7 @@ Die bestehende Python-Pipeline und ihre Referenzartefakte bleiben erhalten.
 [Prospektives Evaluationsprotokoll v1](docs/M4_2_PROSPECTIVE_EVALUATION_V1.md).
 **M4.2a Tageskurse:** [Manueller Abruf, Revisionshistorie und Point-in-Time-Daten](docs/M4_2A_MARKET_DATA_INGESTION.md).
 **M4.2b Current Research:** [Gesperrte Aktivierung, Forecast-Paare, Outcomes und begrenzte Automation](docs/M4_2B_FORECAST_AUTOMATION.md).
+**M4.3 Docker-Test:** [Isolierter historischer HTTPS-Teststack, Ubuntu und Portainer](docs/M4_3_DOCKER_PREVIEW.md).
 
 Der kostenlose Offline-Start zeigt die echten historischen Repository-Snapshots.
 Live-Daten, News und Prognosen werden nicht simuliert. Next-Day-Modelltraining

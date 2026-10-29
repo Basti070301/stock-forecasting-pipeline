@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     allowed_hosts: list[str] = ["127.0.0.1", "localhost", "testserver"]
     api_docs_enabled: bool = True
     allow_mutations: bool = True
+    historical_preview: bool = False
     proxy_token: str = ""
     required_schema_version: int = 1
     research_artifact_dir: Path | None = None

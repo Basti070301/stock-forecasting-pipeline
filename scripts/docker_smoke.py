@@ -17,6 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--env-file", default=".env.docker")
     parser.add_argument("--build", action="store_true")
+    parser.add_argument("--cached-model", action="store_true", help="Nur vorhandenen FinBERT-Cache offline vor/nach Neuerstellung prüfen")
     parser.add_argument(
         "--model",
         action="store_true",
@@ -25,12 +26,13 @@ def main():
     args = parser.parse_args()
     values = load_environment(args.env_file)
     project = values.get("COMPOSE_PROJECT_NAME", "")
+    preview = values.get("SI_DEPLOYMENT_PROFILE") == "historical-preview"
     if (
-        not project.startswith("stockintelligence-m22-test")
+        not (project.startswith("stockintelligence-m22-test") or (preview and project.startswith("stockintelligence-m43-test")))
         or values["SI_BIND_IP"] != "127.0.0.1"
         or values["SI_PUBLIC_HOST"] not in {"127.0.0.1", "localhost"}
     ):
-        parser.error("Nur eigenes stockintelligence-m22-test* Projekt auf 127.0.0.1 erlaubt")
+        parser.error("Nur eigenes markiertes M22-/M43-Testprojekt auf 127.0.0.1 erlaubt")
     environment = {**os.environ, **values}
     compose = [
         "docker",
@@ -42,6 +44,13 @@ def main():
         "-f",
         "compose.yaml",
     ]
+    if preview:
+        compose += ["-f", "compose.preview.yaml"]
+        existing = subprocess.check_output([*compose,"ps","-q","--all"],env=environment,text=True).split()
+        for identity in existing:
+            label = subprocess.check_output(["docker","inspect","--format",'{{index .Config.Labels "org.stockintelligence.profile"}}',identity],env=environment,text=True).strip()
+            if label != "historical-preview":
+                parser.error("Projektname bereits von unmarkierten Containern belegt; Abbruch")
 
     def run(*arguments):
         subprocess.run([*compose, *arguments], env=environment, check=True)
@@ -61,11 +70,20 @@ def main():
     admin("import-reference")
     assert admin("import-reference") == {"stocks": 0, "prices": 0, "features": 0}
     admin("check-writes")
+    if preview:
+        admin("seed-reports")
+        admin("prepare-research")
+        replay = admin("replay-research")
+        assert len(replay["historical_replays"]) == 10
+        repeated = admin("replay-research")
+        assert all(r["reused"] for r in repeated["historical_replays"])
+        persisted_before = admin("verify-preview")
     if args.model:
         admin("download-model")
+    if args.model or args.cached_model:
         admin("check-model")
     run("up", "-d", "--wait", "--wait-timeout", "180")
-    evidence = Path(".runtime/m22-docker")
+    evidence = Path(".runtime/m43-docker" if preview else ".runtime/m22-docker")
     evidence.mkdir(parents=True, exist_ok=True)
     certificate = subprocess.check_output(
         [*compose, "exec", "-T", "si-frontend", "cat", "/var/lib/si-tls/server.crt"],
@@ -95,6 +113,15 @@ def main():
     assert request("/")[0] == 200
     assert request("/api/ready")[0] == 200
     assert request("/api/news/analyze", method="POST")[0] == 403
+    if preview:
+        assert request("/api/forecasts/current", method="POST")[0] == 403
+        assert request("/api/forecasts/research", method="POST")[0] == 403
+        config = json.loads(request("/api/settings")[1])
+        assert config["data_profile"] == "historical_preview" and not config["allow_mutations"]
+        current = json.loads(request("/api/research/current/status")[1])
+        assert current["prospective"]["T0"] is None and not current["scheduler"]["running"]
+        forecasts = json.loads(request("/api/forecasts?kind=research_forecast")[1])["items"]
+        assert len(forecasts) == 10 and all(f["mode"] == "historical_replay" and f["status"] == "research_only" for f in forecasts)
     assert request("/openapi.json")[0] == 404
     before = request("/api/stocks/AAPL/history?limit=5000")
     assert before[0] == 200 and len(json.loads(before[1])["data"]) > 1000
@@ -108,7 +135,9 @@ def main():
         env=environment,
     )
     assert certificate_after == certificate
-    if args.model:
+    if preview:
+        assert admin("verify-preview") == persisted_before
+    if args.model or args.cached_model:
         admin("check-model")  # Offline cache must survive recreation.
     logs = subprocess.check_output(
         [*compose, "logs", "--no-color", "--tail", "200"], env=environment, text=True

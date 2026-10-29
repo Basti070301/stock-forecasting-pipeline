@@ -76,6 +76,8 @@ class MarketService:
             "intervals": ["1d"] if len(frame) else [],
             "source": "Yahoo Finance · Repository-Snapshot"
             if self.store.settings.mode == "demo"
+            else "PostgreSQL · historischer Testbetrieb"
+            if self.store.settings.historical_preview
             else "PostgreSQL · Yahoo Finance",
             "forecast_probability": None,
             "forecast_status": "Nicht freigegeben – keine unabhängig validierte Prognosestrategie",
@@ -115,6 +117,7 @@ class MarketService:
 
     def radar(self, days=7):
         from .news_engine import NewsEngine
+
         engine = NewsEngine(self.store)
         output = []
         for instrument in self.store.instruments():

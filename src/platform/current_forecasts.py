@@ -63,6 +63,11 @@ class CurrentForecastPipeline:
         self.protocol_hash = canonical_hash(test_protocol) if test_protocol else PROTOCOL_SHA256
 
     def gate(self, *, verification=False):
+        if self.settings.historical_preview:
+            raise ForecastError(
+                "historical_preview",
+                "Historischer Docker-Test: Current-Jobs und Provideraktivierung gesperrt",
+            )
         if not self.settings.allow_mutations:
             raise ForecastError("read_only", "Leseprofil: Current-Jobs und Scheduler gesperrt")
         if not self.settings.research_trust_local_artifacts:

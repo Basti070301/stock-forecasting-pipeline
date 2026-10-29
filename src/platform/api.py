@@ -168,13 +168,14 @@ def create_app(settings=None, store=None):
         return {
             "mode": settings.mode,
             "watchlist": state().instruments(),
+            "data_profile": "historical_preview" if settings.historical_preview else settings.mode,
             "token_required": bool(settings.mutation_token),
             "allow_mutations": settings.allow_mutations,
             "providers": [
                 {
                     "name": "Yahoo Finance",
                     "status": "Historischer Repository-Snapshot"
-                    if settings.mode == "demo"
+                    if settings.mode == "demo" or settings.historical_preview
                     else "Manueller Abruf verfügbar; keine Live-SLA",
                 },
                 {

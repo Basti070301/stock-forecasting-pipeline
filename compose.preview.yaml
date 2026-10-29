@@ -1,0 +1,28 @@
+# Historical private test overlay. Always combine with compose.yaml.
+services:
+  si-frontend:
+    image: ${SI_FRONTEND_IMAGE:?Build and configure a versioned preview frontend image}
+    labels: {org.stockintelligence.profile: historical-preview}
+    pull_policy: never
+  si-backend:
+    image: ${SI_BACKEND_IMAGE:?Build and configure a versioned preview backend image}
+    labels: {org.stockintelligence.profile: historical-preview}
+    pull_policy: never
+    environment:
+      SI_HISTORICAL_PREVIEW: "true"
+      SI_REQUIRED_SCHEMA_VERSION: "4"
+      SI_RESEARCH_ARTIFACT_DIR: /app/.runtime/preview-models
+      SI_RESEARCH_TRUST_LOCAL_ARTIFACTS: "true"
+      SI_FINBERT_ENABLED: ${SI_FINBERT_ENABLED:-false}
+      SI_ALLOW_MUTATIONS: "false"
+      SI_NEWS_ENABLED: "false"
+      SI_NEWS_AUTO_REFRESH: "false"
+      SI_FINNHUB_KEY: ""
+      SI_ALPHA_VANTAGE_KEY: ""
+      SI_MARKET_ENABLED: "false"
+      SI_MARKET_RIGHTS_ACCEPTED: "false"
+      SI_CURRENT_ENABLED: "false"
+      SI_CURRENT_AUTO_REFRESH: "false"
+      SI_CURRENT_ACCEPTANCE_ID: ""
+  si-postgres:
+    labels: {org.stockintelligence.profile: historical-preview}

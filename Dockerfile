@@ -12,9 +12,12 @@ COPY --from=wheels /wheels /wheels
 RUN pip install --no-cache-dir --no-index /wheels/*.whl && rm -rf /wheels
 WORKDIR /app
 COPY src/ src/
+RUN python -c "from pathlib import Path; [p.write_bytes(p.read_bytes().replace(b'\r\n', b'\n')) for p in Path('src').rglob('*.py')]"
 COPY sql/ sql/
 COPY reports/model_metrics.json reports/model_metrics.json
+COPY reports/research/m4_2_prospective_protocol_v1.json reports/research/m4_1_retrospective_diagnostic_v1.json reports/research/m4_1_holdout_preflight_v1.json reports/research/
 COPY data/raw/ reference/raw/
+COPY data/raw/ data/raw/
 RUN mkdir -p /app/data/raw/prices /app/data/raw/profiles /app/data/processed /app/data/features /app/.runtime /app/.cache/huggingface && chown -R 10001:10001 /app/data /app/.runtime /app/.cache
 USER 10001:10001
 EXPOSE 8000
